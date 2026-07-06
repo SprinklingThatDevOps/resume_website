@@ -14,9 +14,9 @@ const HEIGHT = 260
 const GROUND_Y = HEIGHT - 42
 const GRAVITY = 2600 // px/s^2
 const JUMP_V = -900 // px/s
-const START_SPEED = 330 // px/s
-const MAX_SPEED = 760
-const SPEED_RAMP = 14 // px/s added per second survived
+const START_SPEED = 300 // px/s
+const MAX_SPEED = 740
+const SPEED_RAMP = 12 // px/s added per second survived
 const HISCORE_KEY = 'ship_it_hiscore'
 
 type Obstacle = { x: number; count: number; w: number }
@@ -89,7 +89,7 @@ export default function RunnerGame() {
     s.obstacles = []
     s.speed = START_SPEED
     s.score = 0
-    s.spawnTimer = 0.8
+    s.spawnTimer = 1.3
   }, [])
 
   const start = useCallback(() => {
@@ -192,8 +192,8 @@ export default function RunnerGame() {
       if (s.spawnTimer <= 0) {
         spawn()
         // Fair gap that stays reactable as speed increases.
-        const base = randBetween(0.9, 1.5)
-        s.spawnTimer = base * (START_SPEED / s.speed) + 0.35
+        const base = randBetween(0.95, 1.5)
+        s.spawnTimer = base * (START_SPEED / s.speed) + 0.45
       }
       for (const o of s.obstacles) o.x -= s.speed * dt
       s.obstacles = s.obstacles.filter((o) => o.x + o.w > -10)
