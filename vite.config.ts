@@ -6,10 +6,10 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    // Bind the IPv4 wildcard explicitly. `host: true` can bind the IPv6
-    // wildcard only ([::]), which some port forwarders don't probe and leads
-    // to ERR_CONNECTION_REFUSED in the browser even though the server is up.
-    host: '0.0.0.0',
+    // Listen on all interfaces (dual-stack: serves both 127.0.0.1 and [::1],
+    // plus the VM's network IP) so the port forwarder connects regardless of
+    // which address family it probes. strictPort avoids silently moving ports.
+    host: true,
     port: 5173,
     strictPort: true,
   },
