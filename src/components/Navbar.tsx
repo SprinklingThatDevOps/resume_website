@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Gamepad2 } from 'lucide-react'
 
 const links = [
   { href: '#about', label: 'About' },
@@ -8,7 +9,7 @@ const links = [
   { href: '#contact', label: 'Contact' },
 ]
 
-export default function Navbar() {
+export default function Navbar({ onExit }: { onExit?: () => void }) {
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -45,12 +46,24 @@ export default function Navbar() {
             </li>
           ))}
         </ul>
-        <a
-          href="#contact"
-          className="rounded-full bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-400"
-        >
-          Get in touch
-        </a>
+        <div className="flex items-center gap-2">
+          {onExit && (
+            <button
+              type="button"
+              onClick={onExit}
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/5"
+            >
+              <Gamepad2 className="h-4 w-4" />
+              Play
+            </button>
+          )}
+          <a
+            href="#contact"
+            className="rounded-full bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-400"
+          >
+            Get in touch
+          </a>
+        </div>
       </nav>
     </header>
   )

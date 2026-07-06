@@ -1,0 +1,354 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+/**
+ * "Ship It!" — a Chrome-dino-style endless runner themed around shipping code
+ * to production. Jump the bugs, rack up commits, don't get rolled back.
+ *
+ * The whole simulation runs inside a single requestAnimationFrame loop using
+ * refs (so we don't re-render React 60x/sec). React state is only used for the
+ * high score badge and the current status, updated on discrete events.
+ */
+
+const WIDTH = 800
+const HEIGHT = 260
+const GROUND_Y = HEIGHT - 42
+const GRAVITY = 2600 // px/s^2
+const JUMP_V = -900 // px/s
+const START_SPEED = 330 // px/s
+const MAX_SPEED = 760
+const SPEED_RAMP = 14 // px/s added per second survived
+const HISCORE_KEY = 'ship_it_hiscore'
+
+type Obstacle = { x: number; count: number; w: number }
+
+type Status = 'idle' | 'running' | 'over'
+
+type GameRefs = {
+  status: Status
+  playerY: number
+  playerVy: number
+  grounded: boolean
+  obstacles: Obstacle[]
+  speed: number
+  score: number
+  spawnTimer: number
+  groundOffset: number
+  clouds: { x: number; y: number; s: number }[]
+  last: number
+}
+
+const PLAYER_X = 66
+const PLAYER_W = 32
+const PLAYER_H = 34
+const OBST_UNIT = 26
+
+function randBetween(a: number, b: number) {
+  return a + Math.random() * (b - a)
+}
+
+function readHiScore(): number {
+  const stored = Number(localStorage.getItem(HISCORE_KEY) || 0)
+  return Number.isNaN(stored) ? 0 : stored
+}
+
+export default function RunnerGame() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const rafRef = useRef<number>(0)
+  const [status, setStatus] = useState<Status>('idle')
+  const [hiScore, setHiScore] = useState(readHiScore)
+  const hiScoreRef = useRef(hiScore)
+  const [lastScore, setLastScore] = useState(0)
+
+  const g = useRef<GameRefs>({
+    status: 'idle',
+    playerY: GROUND_Y - PLAYER_H,
+    playerVy: 0,
+    grounded: true,
+    obstacles: [],
+    speed: START_SPEED,
+    score: 0,
+    spawnTimer: 0.8,
+    groundOffset: 0,
+    clouds: [
+      { x: 200, y: 50, s: 0.4 },
+      { x: 520, y: 80, s: 0.25 },
+      { x: 700, y: 40, s: 0.55 },
+    ],
+    last: 0,
+  })
+
+  useEffect(() => {
+    hiScoreRef.current = hiScore
+  }, [hiScore])
+
+  const reset = useCallback(() => {
+    const s = g.current
+    s.playerY = GROUND_Y - PLAYER_H
+    s.playerVy = 0
+    s.grounded = true
+    s.obstacles = []
+    s.speed = START_SPEED
+    s.score = 0
+    s.spawnTimer = 0.8
+  }, [])
+
+  const start = useCallback(() => {
+    if (g.current.status === 'running') return
+    reset()
+    g.current.status = 'running'
+    setStatus('running')
+  }, [reset])
+
+  const jump = useCallback(() => {
+    const s = g.current
+    if (s.status === 'idle') {
+      start()
+      return
+    }
+    if (s.status === 'over') {
+      start()
+      return
+    }
+    if (s.grounded) {
+      s.playerVy = JUMP_V
+      s.grounded = false
+    }
+  }, [start])
+
+  // Input handling
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (
+        e.code === 'Space' ||
+        e.code === 'ArrowUp' ||
+        e.key === 'w' ||
+        e.key === 'W'
+      ) {
+        e.preventDefault()
+        jump()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [jump])
+
+  // Main loop
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    canvas.width = WIDTH * dpr
+    canvas.height = HEIGHT * dpr
+    ctx.scale(dpr, dpr)
+
+    const endGame = () => {
+      const s = g.current
+      s.status = 'over'
+      const final = Math.floor(s.score)
+      setLastScore(final)
+      setStatus('over')
+      setHiScore((prev) => {
+        const next = Math.max(prev, final)
+        localStorage.setItem(HISCORE_KEY, String(next))
+        return next
+      })
+    }
+
+    const spawn = () => {
+      const s = g.current
+      const count = Math.random() < 0.28 ? 2 : 1
+      s.obstacles.push({ x: WIDTH + 10, count, w: count * OBST_UNIT })
+    }
+
+    const drawEmoji = (emoji: string, x: number, y: number, size: number) => {
+      ctx.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'top'
+      ctx.fillText(emoji, x, y)
+    }
+
+    const update = (dt: number) => {
+      const s = g.current
+      if (s.status !== 'running') return
+
+      s.speed = Math.min(MAX_SPEED, s.speed + SPEED_RAMP * dt)
+      s.score += dt * (s.speed / 12)
+
+      // Player physics
+      s.playerVy += GRAVITY * dt
+      s.playerY += s.playerVy * dt
+      const floor = GROUND_Y - PLAYER_H
+      if (s.playerY >= floor) {
+        s.playerY = floor
+        s.playerVy = 0
+        s.grounded = true
+      }
+
+      // Obstacles
+      s.spawnTimer -= dt
+      if (s.spawnTimer <= 0) {
+        spawn()
+        // Fair gap that stays reactable as speed increases.
+        const base = randBetween(0.9, 1.5)
+        s.spawnTimer = base * (START_SPEED / s.speed) + 0.35
+      }
+      for (const o of s.obstacles) o.x -= s.speed * dt
+      s.obstacles = s.obstacles.filter((o) => o.x + o.w > -10)
+
+      // Collision (AABB with a little forgiveness)
+      const px = PLAYER_X + 5
+      const py = s.playerY + 4
+      const pw = PLAYER_W - 12
+      const ph = PLAYER_H - 8
+      const obH = 22
+      for (const o of s.obstacles) {
+        const ox = o.x + 3
+        const oy = GROUND_Y - obH
+        const ow = o.w - 6
+        if (
+          px < ox + ow &&
+          px + pw > ox &&
+          py < oy + obH &&
+          py + ph > oy
+        ) {
+          endGame()
+          break
+        }
+      }
+
+      // Scenery
+      s.groundOffset = (s.groundOffset + s.speed * dt) % 40
+      for (const c of s.clouds) {
+        c.x -= s.speed * dt * c.s * 0.25
+        if (c.x < -60) {
+          c.x = WIDTH + randBetween(20, 120)
+          c.y = randBetween(28, 96)
+          c.s = randBetween(0.2, 0.6)
+        }
+      }
+    }
+
+    const render = () => {
+      const s = g.current
+
+      // Background
+      const grad = ctx.createLinearGradient(0, 0, 0, HEIGHT)
+      grad.addColorStop(0, '#0b1220')
+      grad.addColorStop(1, '#020617')
+      ctx.fillStyle = grad
+      ctx.fillRect(0, 0, WIDTH, HEIGHT)
+
+      // Clouds (parallax)
+      ctx.globalAlpha = 0.5
+      for (const c of s.clouds) drawEmoji('\u2601\uFE0F', c.x, c.y, 22)
+      ctx.globalAlpha = 1
+
+      // Ground line + moving dashes
+      ctx.strokeStyle = 'rgba(148,163,184,0.35)'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(0, GROUND_Y + 2)
+      ctx.lineTo(WIDTH, GROUND_Y + 2)
+      ctx.stroke()
+      ctx.strokeStyle = 'rgba(14,165,233,0.5)'
+      ctx.lineWidth = 3
+      for (let x = -40 + s.groundOffset; x < WIDTH; x += 40) {
+        ctx.beginPath()
+        ctx.moveTo(x, GROUND_Y + 14)
+        ctx.lineTo(x + 18, GROUND_Y + 14)
+        ctx.stroke()
+      }
+
+      // Obstacles (bugs)
+      for (const o of s.obstacles) {
+        for (let i = 0; i < o.count; i++) {
+          drawEmoji('\uD83D\uDC1B', o.x + i * OBST_UNIT, GROUND_Y - 24, 24)
+        }
+      }
+
+      // Player (rocket shipping code)
+      const bob = s.grounded && s.status === 'running' ? Math.sin(Date.now() / 90) * 1.5 : 0
+      drawEmoji('\uD83D\uDE80', PLAYER_X, s.playerY + bob, 32)
+
+      // HUD score
+      ctx.fillStyle = '#e2e8f0'
+      ctx.font = '600 16px ui-monospace, SFMono-Regular, Menlo, monospace'
+      ctx.textAlign = 'right'
+      ctx.textBaseline = 'top'
+      ctx.fillText(`commits ${String(Math.floor(s.score)).padStart(5, '0')}`, WIDTH - 16, 14)
+      ctx.fillStyle = 'rgba(148,163,184,0.8)'
+      ctx.fillText(`best ${String(hiScoreRef.current).padStart(5, '0')}`, WIDTH - 16, 34)
+
+      // Overlays
+      ctx.textAlign = 'center'
+      if (s.status === 'idle') {
+        ctx.fillStyle = '#38bdf8'
+        ctx.font = '800 30px ui-monospace, SFMono-Regular, Menlo, monospace'
+        ctx.fillText('SHIP IT!', WIDTH / 2, HEIGHT / 2 - 34)
+        ctx.fillStyle = '#cbd5e1'
+        ctx.font = '500 15px ui-monospace, SFMono-Regular, Menlo, monospace'
+        ctx.fillText('Jump the bugs. Ship the commits.', WIDTH / 2, HEIGHT / 2 + 2)
+        ctx.fillStyle = 'rgba(148,163,184,0.9)'
+        ctx.font = '500 13px ui-monospace, SFMono-Regular, Menlo, monospace'
+        ctx.fillText('press SPACE / ↑  ·  or tap  ·  to deploy', WIDTH / 2, HEIGHT / 2 + 26)
+      } else if (s.status === 'over') {
+        ctx.fillStyle = 'rgba(2,6,23,0.55)'
+        ctx.fillRect(0, 0, WIDTH, HEIGHT)
+        ctx.fillStyle = '#f87171'
+        ctx.font = '800 26px ui-monospace, SFMono-Regular, Menlo, monospace'
+        ctx.fillText('\uD83D\uDEA8 ROLLBACK! Deploy failed.', WIDTH / 2, HEIGHT / 2 - 30)
+        ctx.fillStyle = '#e2e8f0'
+        ctx.font = '600 16px ui-monospace, SFMono-Regular, Menlo, monospace'
+        ctx.fillText(`${Math.floor(s.score)} commits shipped`, WIDTH / 2, HEIGHT / 2 + 2)
+        ctx.fillStyle = 'rgba(148,163,184,0.9)'
+        ctx.font = '500 13px ui-monospace, SFMono-Regular, Menlo, monospace'
+        ctx.fillText('press SPACE / ↑ or tap to redeploy', WIDTH / 2, HEIGHT / 2 + 28)
+      }
+    }
+
+    const frame = (t: number) => {
+      const s = g.current
+      if (!s.last) s.last = t
+      let dt = (t - s.last) / 1000
+      s.last = t
+      if (dt > 0.05) dt = 0.05 // clamp to avoid tunneling on tab switch
+      update(dt)
+      render()
+      rafRef.current = requestAnimationFrame(frame)
+    }
+    rafRef.current = requestAnimationFrame(frame)
+
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [])
+
+  return (
+    <div className="w-full">
+      <canvas
+        ref={canvasRef}
+        onPointerDown={(e) => {
+          e.preventDefault()
+          jump()
+        }}
+        role="img"
+        aria-label="Ship It! runner game"
+        className="w-full cursor-pointer touch-none rounded-xl border border-white/10"
+        style={{ aspectRatio: `${WIDTH} / ${HEIGHT}` }}
+      />
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+        <span>
+          {status === 'running'
+            ? 'Deploying… mind the bugs.'
+            : status === 'over'
+              ? `Last run: ${lastScore} commits.`
+              : 'Idle. Awaiting deployment.'}
+        </span>
+        <span className="font-mono">
+          <span className="text-brand-400">best</span> {hiScore} commits
+        </span>
+      </div>
+    </div>
+  )
+}
