@@ -17,6 +17,7 @@ const JUMP_V = -900 // px/s
 const START_SPEED = 300 // px/s
 const MAX_SPEED = 740
 const SPEED_RAMP = 12 // px/s added per second survived
+const RESTART_COOLDOWN = 700 // ms; prevents an accidental instant restart on death
 const HISCORE_KEY = 'ship_it_hiscore'
 
 type Obstacle = { x: number; count: number; w: number }
@@ -35,6 +36,7 @@ type GameRefs = {
   groundOffset: number
   clouds: { x: number; y: number; s: number }[]
   last: number
+  overAt: number
 }
 
 const PLAYER_X = 66
@@ -75,6 +77,7 @@ export default function RunnerGame() {
       { x: 700, y: 40, s: 0.55 },
     ],
     last: 0,
+    overAt: 0,
   })
 
   useEffect(() => {
@@ -106,7 +109,7 @@ export default function RunnerGame() {
       return
     }
     if (s.status === 'over') {
-      start()
+      if (performance.now() - s.overAt >= RESTART_COOLDOWN) start()
       return
     }
     if (s.grounded) {
@@ -147,6 +150,7 @@ export default function RunnerGame() {
     const endGame = () => {
       const s = g.current
       s.status = 'over'
+      s.overAt = performance.now()
       const final = Math.floor(s.score)
       setLastScore(final)
       setStatus('over')
