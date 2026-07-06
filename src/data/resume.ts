@@ -1,8 +1,13 @@
-export type Experience = {
+export type Position = {
   role: string
+  period: string
+}
+
+export type Experience = {
   company: string
   location: string
-  period: string
+  totalPeriod: string
+  positions: Position[]
   highlights: string[]
 }
 
@@ -16,17 +21,39 @@ export type Highlight = {
   description: string
 }
 
+export type Stat = {
+  value: string
+  label: string
+}
+
 export const profile = {
   name: 'Brian Bauer',
-  title: 'Senior Technical Program Manager · Cloud Architect · DevSecOps Engineer',
-  location: 'Madison / Huntsville, AL',
+  headline: 'Driving Mission Success Through Secure Cloud & DevSecOps Innovation',
+  title: 'U.S. Army Program Leader · Cloud Architect · DevSecOps Engineer',
+  location: 'Madison, Alabama, United States',
   phone: '(256) 698-1166',
   email: 'brianbauer007@gmail.com',
-  // Replace with your public LinkedIn profile URL
-  linkedin: 'https://www.linkedin.com/',
+  linkedin: 'https://www.linkedin.com/in/brianbaueralabama',
+  website: 'https://www.likejackbauer.com',
+  verse: 'Colossians 3:23-24',
   summary:
-    'Senior Technical Program Manager, Cloud Architect, and DevSecOps platform leader with defense-contractor experience delivering SPDS for Army software modernization. Designs and architects secure multi-tenant cloud and DevSecOps platform patterns across AWS GovCloud, Zero Trust access, CI/CD, Infrastructure as Code, tenant onboarding, and certified pipeline capabilities — bridging hands-on architecture with program leadership, stakeholder alignment, compliance evidence, and roadmap execution.',
+    'Seasoned Cloud Computing and DevSecOps professional with 15+ years of experience driving innovation and excellence in software and platform engineering for the U.S. Army. Currently leading a team of DevOps Engineers pioneering a cutting-edge, cloud-based software development environment tailored for Army applications, with a focus on Zero Trust access principles that enable secure, efficient collaboration with Defense Industrial Base (DIB) mission partners.',
+  summarySecondary:
+    'Designs secure multi-tenant cloud and DevSecOps platform patterns across AWS GovCloud and Azure — spanning Zero Trust access, CI/CD, Infrastructure as Code, tenant onboarding, and certified pipeline capabilities — while bridging hands-on architecture with program leadership, stakeholder alignment, compliance evidence, and roadmap execution.',
 }
+
+export const stats: Stat[] = [
+  { value: '15+', label: 'Years in Cloud & DevSecOps' },
+  { value: 'AWS GovCloud', label: 'Army Mission Platforms' },
+  { value: 'Zero Trust', label: 'Access Architecture' },
+  { value: 'ISO 27001', label: 'Compliance Lead' },
+]
+
+export const topSkills = [
+  'Zscaler Zero Trust Exchange',
+  'Cloud Computing',
+  'Solution Architecture',
+]
 
 export const pillars: Highlight[] = [
   {
@@ -55,7 +82,7 @@ export const skillGroups: SkillGroup[] = [
       'Landing Zones',
       'Multi-Tenant Platforms',
       'Kubernetes',
-      'Service Platforms',
+      'Azure SQL',
       'Cloud Operations',
     ],
   },
@@ -69,6 +96,7 @@ export const skillGroups: SkillGroup[] = [
       'CI/CD',
       'GitOps',
       'Terraform',
+      'ARM',
       'Packer',
       'PowerShell',
       'Infrastructure as Code',
@@ -77,13 +105,14 @@ export const skillGroups: SkillGroup[] = [
   {
     category: 'Security & Reliability',
     skills: [
+      'Zscaler Zero Trust Exchange',
       'Zero Trust Access Design',
       'STIG-Aligned Automation',
+      'ISO 27001',
       'SRE',
-      'SLOs',
-      'HA/DR',
+      'SLOs / SLAs',
+      'HA / Geo-Redundant DR',
       'Observability',
-      'Service Readiness',
       'Compliance Evidence',
     ],
   },
@@ -94,103 +123,90 @@ export const skillGroups: SkillGroup[] = [
       'Windows Server',
       'Linux / RHEL',
       'IIS',
-      'Oracle Support',
-      'Database Availability',
+      'Oracle',
+      'Availability Groups',
       'Backup / Recovery',
-      'Performance Troubleshooting',
+      'SSIS Data Integration',
     ],
   },
 ]
 
 export const experience: Experience[] = [
   {
-    role: 'Senior Technical Program Manager',
     company: 'SAIC',
-    location: 'Huntsville, AL',
-    period: 'Aug 2025 – Present',
+    location: 'Huntsville, Alabama',
+    totalPeriod: 'Jun 2023 – Present · 3 yrs 2 mos',
+    positions: [
+      { role: 'Program Mgmt Sr Manager', period: 'May 2026 – Present' },
+      { role: 'Program Manager', period: 'Aug 2025 – May 2026' },
+      { role: 'Cloud Comp Engineer, Senior Manager', period: 'Jun 2023 – Aug 2025' },
+    ],
     highlights: [
-      'Lead SPDS program execution as a defense contractor supporting Army software modernization, embedded software delivery, and secure government/industry collaboration.',
-      'Coordinate roadmap, priorities, delivery risks, stakeholder expectations, cybersecurity inputs, accreditation needs, and cross-team execution across SPDS platform workstreams.',
-      'Drive alignment between Army stakeholders, engineering teams, assurance partners, contractors, and leadership to turn mission requirements into executable platform outcomes.',
-      'Oversee delivery patterns for tenant onboarding, certified DevSecOps pipeline capabilities, Zero Trust partner access, cloud operations, and secure software delivery governance.',
+      'Lead a team of DevOps Engineers building an innovative cloud-based software development environment for Army software development, supporting embedded software delivery and secure government/industry collaboration.',
+      'Architect a solution enforcing Zero Trust access principles to facilitate access for Defense Industrial Base (DIB) mission partners rather than one-off application exceptions.',
+      'Served as primary architect for the SPDS platform — the cloud-hosted DevSecOps environment, multi-tenant architecture, secure account/network boundaries, and a repeatable tenant delivery model in AWS GovCloud using landing-zone concepts and Infrastructure as Code.',
+      'Integrate platform capabilities across GitLab, Azure DevOps, Jira, Nexus Repository, package/container governance, CI/CD pipelines, and automated compliance evidence workflows.',
+      'Coordinate roadmap, priorities, delivery risks, stakeholder expectations, cybersecurity inputs, and accreditation needs across SPDS platform workstreams.',
     ],
   },
   {
-    role: 'Cloud Comp Engineer — Senior Management',
-    company: 'SAIC',
-    location: 'Huntsville, AL',
-    period: 'Jun 2023 – Aug 2025',
+    company: 'Hexagon Asset Lifecycle Intelligence',
+    location: 'Madison, Alabama',
+    totalPeriod: 'Aug 2014 – Jun 2023 · 8 yrs 11 mos',
+    positions: [
+      {
+        role: 'Senior Manager | Cloud Solutions | Site Reliability Engineering',
+        period: 'Oct 2021 – Jun 2023',
+      },
+      { role: 'DevOps Consultant', period: 'May 2018 – Oct 2021' },
+      { role: 'Database Administrator', period: 'Dec 2014 – Oct 2021' },
+      { role: 'Principal MIS Analyst', period: 'Aug 2014 – Oct 2021' },
+    ],
     highlights: [
-      'Served as primary architect for the SPDS platform, designing the cloud-hosted DevSecOps environment, multi-tenant architecture, secure account/network boundaries, and a repeatable tenant delivery model.',
-      'Architected SPDS in AWS GovCloud using landing-zone concepts, Infrastructure as Code patterns, cloud governance, automation, and secure platform baselines for mission software teams.',
-      'Designed scalable Defense Industrial Base partner access and on-prem hardware-in-the-loop integration patterns using Zero Trust principles rather than one-off application exceptions.',
-      'Integrated platform capabilities across GitLab, Azure DevOps, Jira, Nexus Repository, package/container governance, CI/CD pipelines, and automated compliance evidence workflows.',
-      'Established platform architecture direction for secure DevSecOps, certified pipeline enablement, software factory patterns, tenant onboarding, and operational repeatability.',
+      'Managed a global SRE team focused on DevOps, CI/CD, automation, Microsoft Azure cloud, Terraform, and Kubernetes; deployed global, highly available cloud applications using Infrastructure as Code and Continuous Delivery with High Availability and geo-redundant Disaster Recovery.',
+      'Held the lead role in obtaining ISO 27001 compliance and rolled out the first formal Site Reliability Engineering function for the organization.',
+      'Built an SRE monitoring and automation toolkit to ensure SLOs, SLAs, and reliability of a global Azure cloud service environment, and created a service readiness review process for onboarding teams onto the SRE-managed platform.',
+      'As DevOps Consultant, designed CI/CD pipelines for Azure deployments from Azure DevOps and migrated teams from TFVC to Git with Pull Request workflows to accelerate feature delivery.',
+      'Administered SQL Server environments (security, sizing, log shipping, backups, replication, Availability Groups, mirroring) with deep Azure SQL, IaaS, and analytics experience; led large data migrations and performed Sarbanes-Oxley (SOX) compliant security audits.',
     ],
   },
   {
-    role: 'Senior Manager — Site Reliability Engineering',
-    company: 'Hexagon PPM',
-    location: 'Madison, AL',
-    period: '2021 – 2023',
-    highlights: [
-      'Managed a global SRE team focused on DevOps, CI/CD, automation, Microsoft Azure cloud operations, Terraform, Kubernetes, and production reliability.',
-      'Led design and deployment of a global multi-tenant application platform using Infrastructure as Code and Continuous Delivery practices.',
-      'Product Owner for a Kubernetes-based multi-tenant service platform and introduced the organization\u2019s first formal SRE function.',
-      'Developed monitoring, automation, service readiness, and operational standards to improve SLO management and production ownership maturity.',
+    company: 'Hexagon Safety & Infrastructure',
+    location: 'Madison, Alabama',
+    totalPeriod: 'Apr 2007 – Oct 2014 · 7 yrs 7 mos',
+    positions: [
+      { role: 'Software Support Engineer', period: 'Apr 2007 – Oct 2014' },
     ],
-  },
-  {
-    role: 'DevOps Consultant',
-    company: 'Hexagon PPM',
-    location: 'Madison, AL',
-    period: '2017 – 2021',
     highlights: [
-      'Lead DevOps Engineer for globally available, business-critical cloud licensing applications.',
-      'Led cloud-first patterns across CI/CD, release management, automation, zero-downtime deployment, Azure, AWS, Infrastructure as Code, and operations.',
-      'Integrated Terraform Cloud into CI/CD workflows and designed pipelines for deployments to Azure and AWS from Azure DevOps.',
-      'Migrated on-premise applications to Azure while improving release consistency, deployment repeatability, and operational supportability.',
-    ],
-  },
-  {
-    role: 'Database Administrator',
-    company: 'Intergraph',
-    location: 'Madison, AL',
-    period: '2014 – 2018',
-    highlights: [
-      'Administered SQL Server environments including security, sizing, backups, replication, log shipping, Availability Groups, and database mirroring.',
-      'Automated routine and complex procedures using custom PowerShell modules and scripts.',
-      'Designed redundant systems, policies, and procedures for disaster recovery and high availability.',
-    ],
-  },
-  {
-    role: 'Software Support Engineer',
-    company: 'Intergraph',
-    location: 'Madison, AL',
-    period: '2007 – 2014',
-    highlights: [
-      'Troubleshot, configured, and supported Intergraph public safety products across Windows Server, SQL Server, Oracle, IIS, SSIS, and GIS workflows.',
-      'Created testing, QA, and training environments and delivered instructor-led training for government, Army, university, and law enforcement end users.',
-      'Provided critical 24/7 support to public safety system administrators and supported GIS production/data-integration workflows.',
+      'Troubleshot, configured, and supported the Intergraph suite of public safety products (I/CAD Suite, I/Mobile, GeoMedia Pro, Video Analyst, I/MDT) with emphasis on SQL Server, GIS, and SSIS data integration.',
+      'Supported SQL Server and Oracle installation, maintenance, and administration, and created testing, QA, and training environments on Windows Server and IIS.',
+      'Delivered instructor-led training for government, Army, and law enforcement end users — including train-the-trainer sessions for Morgan State University staff — and provided critical 24/7 after-hours support to public safety system administrators.',
     ],
   },
 ]
 
 export const education = [
   {
-    credential: 'A.S., Business Administration',
-    institution: 'Calhoun Community College — Huntsville, AL',
+    credential: "Associate's Degree, Business Administration",
+    institution: 'John C. Calhoun State Community College',
+    period: '1999 – 2007',
+  },
+  {
+    credential: 'Coursework',
+    institution: 'Athens State University',
+    period: '2016',
   },
 ]
 
 export const certifications = [
-  'CompTIA Security+ CE',
   'AWS Certified Cloud Practitioner',
+  'CompTIA Security+ ce',
+  'Developing Frontline Leaders Program',
 ]
 
 export const professionalDevelopment = [
   'Microsoft DevOps FastTrack',
   'SQL Server Administration',
   'PowerShell Automation',
-  'Customer Service Leadership',
+  'Site Reliability Engineering (SRE)',
 ]

@@ -20,9 +20,10 @@ export default function Education() {
           <h3 className="text-base font-semibold text-white">Education</h3>
           <ul className="mt-4 space-y-3">
             {education.map((item) => (
-              <li key={item.credential} className="text-sm text-slate-300">
+              <li key={item.institution} className="text-sm text-slate-300">
                 <p className="font-medium text-white">{item.credential}</p>
                 <p className="text-slate-400">{item.institution}</p>
+                <p className="text-xs text-slate-500">{item.period}</p>
               </li>
             ))}
           </ul>
