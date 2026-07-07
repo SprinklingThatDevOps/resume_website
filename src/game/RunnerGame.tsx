@@ -74,12 +74,74 @@ function readHiScore(): number {
 export default function RunnerGame() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const rafRef = useRef<number>(0)
+  const audioRef = useRef<AudioContext | null>(null)
   const [status, setStatus] = useState<Status>('idle')
   const [hiScore, setHiScore] = useState(readHiScore)
   const hiScoreRef = useRef(hiScore)
   const [lastScore, setLastScore] = useState(0)
   const [catCharges, setCatCharges] = useState(0)
   const [catNote, setCatNote] = useState('CatOps may join mid-run. Cats swat bugs; rockets ship code.')
+
+  const getAudioContext = useCallback(() => {
+    const AudioContextCtor =
+      window.AudioContext ??
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioContextCtor) return null
+
+    const audio = audioRef.current ?? new AudioContextCtor()
+    audioRef.current = audio
+    return audio
+  }, [])
+
+  const primeCatOpsAudio = useCallback(() => {
+    const audio = getAudioContext()
+    if (audio?.state === 'suspended') void audio.resume()
+  }, [getAudioContext])
+
+  const playCatOpsMeow = useCallback(() => {
+    const audio = getAudioContext()
+    if (!audio) return
+
+    if (audio.state === 'suspended') void audio.resume()
+
+    const now = audio.currentTime
+    const voice = audio.createOscillator()
+    const trill = audio.createOscillator()
+    const gain = audio.createGain()
+    const filter = audio.createBiquadFilter()
+
+    voice.type = 'sine'
+    trill.type = 'triangle'
+    filter.type = 'bandpass'
+    filter.frequency.setValueAtTime(940, now)
+    filter.Q.setValueAtTime(4.5, now)
+
+    voice.frequency.setValueAtTime(760, now)
+    voice.frequency.exponentialRampToValueAtTime(520, now + 0.12)
+    voice.frequency.exponentialRampToValueAtTime(360, now + 0.28)
+    trill.frequency.setValueAtTime(1140, now)
+    trill.frequency.exponentialRampToValueAtTime(780, now + 0.2)
+
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.09, now + 0.025)
+    gain.gain.exponentialRampToValueAtTime(0.035, now + 0.16)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.34)
+
+    voice.connect(filter)
+    trill.connect(filter)
+    filter.connect(gain)
+    gain.connect(audio.destination)
+    voice.start(now)
+    trill.start(now + 0.025)
+    voice.stop(now + 0.35)
+    trill.stop(now + 0.29)
+  }, [getAudioContext])
+
+  useEffect(() => {
+    return () => {
+      void audioRef.current?.close()
+    }
+  }, [])
 
   const g = useRef<GameRefs>({
     status: 'idle',
@@ -137,6 +199,8 @@ export default function RunnerGame() {
   }, [reset])
 
   const jump = useCallback(() => {
+    primeCatOpsAudio()
+
     const s = g.current
     if (s.status === 'idle') {
       start()
@@ -150,7 +214,7 @@ export default function RunnerGame() {
       s.playerVy = JUMP_V
       s.grounded = false
     }
-  }, [start])
+  }, [primeCatOpsAudio, start])
 
   // Input handling
   useEffect(() => {
@@ -270,6 +334,7 @@ export default function RunnerGame() {
           s.catCharges = Math.min(MAX_CAT_CHARGES, s.catCharges + 1)
           setCatCharges(s.catCharges)
           setCatMessage('CatOps joined the release. Rollback shield armed.')
+          playCatOpsMeow()
         } else if (cat.x > -50) {
           remainingCats.push(cat)
         }
@@ -452,7 +517,7 @@ export default function RunnerGame() {
     rafRef.current = requestAnimationFrame(frame)
 
     return () => cancelAnimationFrame(rafRef.current)
-  }, [])
+  }, [playCatOpsMeow])
 
   return (
     <div className="w-full">
