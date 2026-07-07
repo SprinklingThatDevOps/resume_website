@@ -48,6 +48,15 @@ function ResumePage({ onExit }: { onExit: () => void }) {
   )
 }
 
+function GamePage({ onClassic }: { onClassic: () => void }) {
+  return (
+    <div id="game-top" className="min-h-screen bg-slate-950">
+      <Console onClassic={onClassic} />
+      <Footer backToTopHref="#game-top" />
+    </div>
+  )
+}
+
 export default function App() {
   const [view, setView] = useState<View>(() => viewFromHash(window.location.hash))
 
@@ -70,6 +79,6 @@ export default function App() {
   return view === 'resume' ? (
     <ResumePage onExit={() => go('game')} />
   ) : (
-    <Console onClassic={() => go('resume')} />
+    <GamePage onClassic={() => go('resume')} />
   )
 }

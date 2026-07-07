@@ -57,7 +57,11 @@ function AmplifyHostedBadge() {
   )
 }
 
-export default function Footer() {
+type FooterProps = {
+  backToTopHref?: string
+}
+
+export default function Footer({ backToTopHref = '#top' }: FooterProps) {
   return (
     <footer className="border-t border-white/5 py-10">
       <div className="mx-auto max-w-5xl px-6">
@@ -71,7 +75,7 @@ export default function Footer() {
           </p>
           <AmplifyHostedBadge />
           <a
-            href="#top"
+            href={backToTopHref}
             className="text-center transition-colors hover:text-white sm:text-right"
           >
             Back to top ↑
