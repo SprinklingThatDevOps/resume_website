@@ -21,6 +21,8 @@ const RESTART_COOLDOWN = 700 // ms; prevents an accidental instant restart on de
 const HISCORE_KEY = 'ship_it_hiscore'
 
 type Obstacle = { x: number; count: number; w: number }
+type CatPickup = { x: number; y: number; emoji: string; phase: number }
+type CatPounce = { x: number; y: number; t: number }
 
 type Status = 'idle' | 'running' | 'over'
 
@@ -30,6 +32,12 @@ type GameRefs = {
   playerVy: number
   grounded: boolean
   obstacles: Obstacle[]
+  catPickups: CatPickup[]
+  catCharges: number
+  catSpawnTimer: number
+  catMessage: string
+  catMessageTimer: number
+  catPounce: CatPounce | null
   speed: number
   score: number
   spawnTimer: number
@@ -43,9 +51,19 @@ const PLAYER_X = 66
 const PLAYER_W = 32
 const PLAYER_H = 34
 const OBST_UNIT = 26
+const CAT_W = 30
+const CAT_H = 26
+const MAX_CAT_CHARGES = 3
 
 function randBetween(a: number, b: number) {
   return a + Math.random() * (b - a)
+}
+
+function intersects(
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number },
+) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
 }
 
 function readHiScore(): number {
@@ -60,6 +78,8 @@ export default function RunnerGame() {
   const [hiScore, setHiScore] = useState(readHiScore)
   const hiScoreRef = useRef(hiScore)
   const [lastScore, setLastScore] = useState(0)
+  const [catCharges, setCatCharges] = useState(0)
+  const [catNote, setCatNote] = useState('CatOps may join mid-run. Cats swat bugs; rockets ship code.')
 
   const g = useRef<GameRefs>({
     status: 'idle',
@@ -67,6 +87,12 @@ export default function RunnerGame() {
     playerVy: 0,
     grounded: true,
     obstacles: [],
+    catPickups: [],
+    catCharges: 0,
+    catSpawnTimer: 5.5,
+    catMessage: '',
+    catMessageTimer: 0,
+    catPounce: null,
     speed: START_SPEED,
     score: 0,
     spawnTimer: 0.8,
@@ -90,9 +116,17 @@ export default function RunnerGame() {
     s.playerVy = 0
     s.grounded = true
     s.obstacles = []
+    s.catPickups = []
+    s.catCharges = 0
+    s.catSpawnTimer = 5.5
+    s.catMessage = ''
+    s.catMessageTimer = 0
+    s.catPounce = null
     s.speed = START_SPEED
     s.score = 0
     s.spawnTimer = 1.3
+    setCatCharges(0)
+    setCatNote('CatOps may join mid-run. Cats swat bugs; rockets ship code.')
   }, [])
 
   const start = useCallback(() => {
@@ -167,6 +201,24 @@ export default function RunnerGame() {
       s.obstacles.push({ x: WIDTH + 10, count, w: count * OBST_UNIT })
     }
 
+    const spawnCat = () => {
+      const s = g.current
+      if (s.catCharges >= MAX_CAT_CHARGES || s.catPickups.length > 0) return
+      s.catPickups.push({
+        x: WIDTH + randBetween(20, 70),
+        y: GROUND_Y - CAT_H - 4,
+        emoji: Math.random() < 0.55 ? '\uD83D\uDC08\u200D\u2B1B' : '\uD83D\uDC08',
+        phase: Math.random() * Math.PI * 2,
+      })
+    }
+
+    const setCatMessage = (message: string) => {
+      const s = g.current
+      s.catMessage = message
+      s.catMessageTimer = 1.75
+      setCatNote(message)
+    }
+
     const drawEmoji = (emoji: string, x: number, y: number, size: number) => {
       ctx.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`
       ctx.textAlign = 'left'
@@ -180,6 +232,12 @@ export default function RunnerGame() {
 
       s.speed = Math.min(MAX_SPEED, s.speed + SPEED_RAMP * dt)
       s.score += dt * (s.speed / 12)
+      s.catMessageTimer = Math.max(0, s.catMessageTimer - dt)
+      if (s.catPounce) {
+        s.catPounce.t -= dt
+        s.catPounce.x -= s.speed * dt
+        if (s.catPounce.t <= 0) s.catPounce = null
+      }
 
       // Player physics
       s.playerVy += GRAVITY * dt
@@ -190,6 +248,33 @@ export default function RunnerGame() {
         s.playerVy = 0
         s.grounded = true
       }
+
+      const playerBox = {
+        x: PLAYER_X + 5,
+        y: s.playerY + 4,
+        w: PLAYER_W - 12,
+        h: PLAYER_H - 8,
+      }
+
+      // CatOps pickups: collect a helper cat that can swat one production bug.
+      s.catSpawnTimer -= dt
+      if (s.catSpawnTimer <= 0) {
+        spawnCat()
+        s.catSpawnTimer = randBetween(8, 13) * (START_SPEED / Math.min(s.speed, MAX_SPEED))
+      }
+      for (const cat of s.catPickups) cat.x -= s.speed * dt * 0.92
+      const remainingCats: CatPickup[] = []
+      for (const cat of s.catPickups) {
+        const catBox = { x: cat.x + 2, y: cat.y + 3, w: CAT_W, h: CAT_H }
+        if (intersects(playerBox, catBox)) {
+          s.catCharges = Math.min(MAX_CAT_CHARGES, s.catCharges + 1)
+          setCatCharges(s.catCharges)
+          setCatMessage('CatOps joined the release. Rollback shield armed.')
+        } else if (cat.x > -50) {
+          remainingCats.push(cat)
+        }
+      }
+      s.catPickups = remainingCats
 
       // Obstacles
       s.spawnTimer -= dt
@@ -203,21 +288,24 @@ export default function RunnerGame() {
       s.obstacles = s.obstacles.filter((o) => o.x + o.w > -10)
 
       // Collision (AABB with a little forgiveness)
-      const px = PLAYER_X + 5
-      const py = s.playerY + 4
-      const pw = PLAYER_W - 12
-      const ph = PLAYER_H - 8
       const obH = 22
       for (const o of s.obstacles) {
-        const ox = o.x + 3
-        const oy = GROUND_Y - obH
-        const ow = o.w - 6
-        if (
-          px < ox + ow &&
-          px + pw > ox &&
-          py < oy + obH &&
-          py + ph > oy
-        ) {
+        const obstacleBox = {
+          x: o.x + 3,
+          y: GROUND_Y - obH,
+          w: o.w - 6,
+          h: obH,
+        }
+        if (intersects(playerBox, obstacleBox)) {
+          if (s.catCharges > 0) {
+            s.catCharges -= 1
+            s.score += 25
+            s.catPounce = { x: o.x - 6, y: GROUND_Y - 46, t: 0.55 }
+            setCatCharges(s.catCharges)
+            setCatMessage('CatOps swatted a production bug. +25 commits.')
+            s.obstacles = s.obstacles.filter((item) => item !== o)
+            break
+          }
           endGame()
           break
         }
@@ -273,6 +361,26 @@ export default function RunnerGame() {
         }
       }
 
+      // CatOps pickups and pounce effect
+      for (const cat of s.catPickups) {
+        const trot = Math.sin(Date.now() / 140 + cat.phase) * 1.5
+        drawEmoji(cat.emoji, cat.x, cat.y + trot, 24)
+        ctx.fillStyle = 'rgba(251,191,36,0.82)'
+        ctx.font = '700 10px ui-monospace, SFMono-Regular, Menlo, monospace'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'top'
+        ctx.fillText('catops', cat.x + 14, cat.y - 12 + trot)
+      }
+      if (s.catPounce) {
+        const lift = Math.sin((1 - s.catPounce.t / 0.55) * Math.PI) * 18
+        drawEmoji('\uD83D\uDC08\u200D\u2B1B', s.catPounce.x, s.catPounce.y - lift, 28)
+        ctx.fillStyle = 'rgba(251,191,36,0.95)'
+        ctx.font = '800 12px ui-monospace, SFMono-Regular, Menlo, monospace'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'top'
+        ctx.fillText('MEOW-OPS', s.catPounce.x + 20, s.catPounce.y - lift - 16)
+      }
+
       // Player (rocket shipping code)
       const bob = s.grounded && s.status === 'running' ? Math.sin(Date.now() / 90) * 1.5 : 0
       drawEmoji('\uD83D\uDE80', PLAYER_X, s.playerY + bob, 32)
@@ -285,6 +393,23 @@ export default function RunnerGame() {
       ctx.fillText(`commits ${String(Math.floor(s.score)).padStart(5, '0')}`, WIDTH - 16, 14)
       ctx.fillStyle = 'rgba(148,163,184,0.8)'
       ctx.fillText(`best ${String(hiScoreRef.current).padStart(5, '0')}`, WIDTH - 16, 34)
+      ctx.textAlign = 'left'
+      ctx.fillStyle = s.catCharges > 0 ? '#fbbf24' : 'rgba(148,163,184,0.72)'
+      ctx.font = '700 13px ui-monospace, SFMono-Regular, Menlo, monospace'
+      ctx.fillText(`catops ${s.catCharges > 0 ? '\uD83D\uDC08\u200D\u2B1B'.repeat(s.catCharges) : 'standby'}`, 16, 14)
+      if (s.catMessageTimer > 0 && s.catMessage) {
+        ctx.globalAlpha = Math.min(1, s.catMessageTimer)
+        ctx.fillStyle = 'rgba(15,23,42,0.82)'
+        const msgWidth = Math.min(440, ctx.measureText(s.catMessage).width + 28)
+        ctx.fillRect(WIDTH / 2 - msgWidth / 2, 50, msgWidth, 28)
+        ctx.strokeStyle = 'rgba(251,191,36,0.35)'
+        ctx.strokeRect(WIDTH / 2 - msgWidth / 2, 50, msgWidth, 28)
+        ctx.fillStyle = '#fde68a'
+        ctx.textAlign = 'center'
+        ctx.font = '700 12px ui-monospace, SFMono-Regular, Menlo, monospace'
+        ctx.fillText(s.catMessage, WIDTH / 2, 58)
+        ctx.globalAlpha = 1
+      }
 
       // Overlays
       ctx.textAlign = 'center'
@@ -294,10 +419,11 @@ export default function RunnerGame() {
         ctx.fillText('SHIP IT!', WIDTH / 2, HEIGHT / 2 - 34)
         ctx.fillStyle = '#cbd5e1'
         ctx.font = '500 15px ui-monospace, SFMono-Regular, Menlo, monospace'
-        ctx.fillText('Jump the bugs. Ship the commits.', WIDTH / 2, HEIGHT / 2 + 2)
+        ctx.fillText('Jump the bugs. Recruit CatOps. Ship the commits.', WIDTH / 2, HEIGHT / 2 + 2)
         ctx.fillStyle = 'rgba(148,163,184,0.9)'
         ctx.font = '500 13px ui-monospace, SFMono-Regular, Menlo, monospace'
-        ctx.fillText('press SPACE / ↑  ·  or tap  ·  to deploy', WIDTH / 2, HEIGHT / 2 + 26)
+        ctx.fillText('collect cats for one emergency bug swat', WIDTH / 2, HEIGHT / 2 + 26)
+        ctx.fillText('press SPACE / ↑  ·  or tap  ·  to deploy', WIDTH / 2, HEIGHT / 2 + 46)
       } else if (s.status === 'over') {
         ctx.fillStyle = 'rgba(2,6,23,0.55)'
         ctx.fillRect(0, 0, WIDTH, HEIGHT)
@@ -344,7 +470,9 @@ export default function RunnerGame() {
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
         <span>
           {status === 'running'
-            ? 'Deploying… mind the bugs.'
+            ? catCharges > 0
+              ? `Deploying… CatOps has ${catCharges} rollback shield${catCharges === 1 ? '' : 's'} ready.`
+              : catNote
             : status === 'over'
               ? `Last run: ${lastScore} commits.`
               : 'Idle. Awaiting deployment.'}
