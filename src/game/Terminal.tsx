@@ -165,19 +165,12 @@ export default function Terminal({ onPlay, onClassic }: TerminalProps) {
       case 'contact':
         print([
           <span className="text-slate-300">email: <a className="text-brand-400 underline" href={`mailto:${profile.email}`}>{profile.email}</a></span>,
-          <span className="text-slate-300">phone: <span className="text-slate-400">{profile.phone}</span></span>,
           <span className="text-slate-300">linkedin: <a className="text-brand-400 underline" href={profile.linkedin} target="_blank" rel="noreferrer noopener">/in/brianbaueralabama</a></span>,
-          <span className="text-slate-300">web: <a className="text-brand-400 underline" href={profile.website} target="_blank" rel="noreferrer noopener">likejackbauer.com</a></span>,
         ])
         break
       case 'linkedin':
         print([<span className="text-slate-400">opening LinkedIn…</span>])
         openUrl(profile.linkedin)
-        break
-      case 'website':
-      case 'web':
-        print([<span className="text-slate-400">opening likejackbauer.com…</span>])
-        openUrl(profile.website)
         break
       case 'resume':
       case 'cv':

@@ -31,10 +31,8 @@ export const profile = {
   headline: 'Driving Mission Success Through Secure Cloud & DevSecOps Innovation',
   title: 'U.S. Army Program Leader · Cloud Architect · DevSecOps Engineer',
   location: 'Madison, Alabama, United States',
-  phone: '(256) 698-1166',
   email: 'brianbauer007@gmail.com',
   linkedin: 'https://www.linkedin.com/in/brianbaueralabama',
-  website: 'https://www.likejackbauer.com',
   verse: 'Colossians 3:23-24',
   summary:
     'Seasoned Cloud Computing and DevSecOps professional with 15+ years of experience driving innovation and excellence in software and platform engineering for the U.S. Army. Currently leading a team of DevOps Engineers pioneering a cutting-edge, cloud-based software development environment tailored for Army applications, with a focus on Zero Trust access principles that enable secure, efficient collaboration with Defense Industrial Base (DIB) mission partners.',
