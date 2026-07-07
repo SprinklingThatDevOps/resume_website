@@ -9,7 +9,9 @@ frontend:
         - npm install -g pnpm@11.7.0
         - pnpm --version
         - pnpm config set store-dir .pnpm-store
-        - pnpm install --frozen-lockfile
+        - rm -rf node_modules
+        - pnpm install --frozen-lockfile --prod=false
+        - pnpm exec vite --version
     build:
       commands:
         - pnpm build
@@ -20,4 +22,3 @@ frontend:
   cache:
     paths:
       - .pnpm-store/**/*
-      - node_modules/**/*
