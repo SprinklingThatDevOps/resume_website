@@ -1,5 +1,5 @@
 import { motion } from 'motion/react'
-import { ArrowDown, Globe, Mail, MapPin } from 'lucide-react'
+import { ArrowDown, Mail, MapPin } from 'lucide-react'
 import LinkedInIcon from './icons/LinkedInIcon'
 import { profile, topSkills } from '../data/resume'
 
@@ -74,15 +74,6 @@ export default function Hero() {
             >
               <Mail className="h-4 w-4 text-brand-400" />
               {profile.email}
-            </a>
-            <a
-              href={profile.website}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="inline-flex items-center gap-2 transition-colors hover:text-white"
-            >
-              <Globe className="h-4 w-4 text-brand-400" />
-              likejackbauer.com
             </a>
           </div>
         </motion.div>

@@ -1,5 +1,5 @@
 import { motion } from 'motion/react'
-import { Globe, Mail, MapPin, Phone } from 'lucide-react'
+import { Mail, MapPin } from 'lucide-react'
 import LinkedInIcon from './icons/LinkedInIcon'
 import Section from './Section'
 import { profile } from '../data/resume'
@@ -7,9 +7,7 @@ import { profile } from '../data/resume'
 export default function Contact() {
   const items = [
     { icon: Mail, label: 'Email', value: profile.email, href: `mailto:${profile.email}` },
-    { icon: Phone, label: 'Phone', value: profile.phone, href: `tel:${profile.phone.replace(/[^0-9+]/g, '')}` },
     { icon: LinkedInIcon, label: 'LinkedIn', value: '/in/brianbaueralabama', href: profile.linkedin },
-    { icon: Globe, label: 'Website', value: 'likejackbauer.com', href: profile.website },
     { icon: MapPin, label: 'Location', value: profile.location },
   ]
 
