@@ -3,9 +3,11 @@ frontend:
   phases:
     preBuild:
       commands:
-        - nvm use 22
-        - corepack enable
-        - corepack prepare pnpm@11.7.0 --activate
+        - nvm install 22.22.2
+        - nvm use 22.22.2
+        - node --version
+        - npm install -g pnpm@11.7.0
+        - pnpm --version
         - pnpm config set store-dir .pnpm-store
         - pnpm install --frozen-lockfile
     build:
