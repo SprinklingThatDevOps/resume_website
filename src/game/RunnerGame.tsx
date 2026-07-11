@@ -56,122 +56,199 @@ function readHiScore(): number {
 // --- Vector sprites (drawn with canvas primitives so they render on every
 // device; emoji drawn to <canvas> are unreliable, especially on mobile). ---
 
-function drawRocket(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
-  const cy = y + s / 2
-  const bx0 = x + s * 0.16
-  const bx1 = x + s * 0.74
-  const bh = s * 0.42
+// "DevOps" the cat, brandishing a wrench. Drawn facing right within [x, y, s].
+function drawDevOpsCat(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
+  const gray = '#cbd5e1'
+  const dark = '#64748b'
+  const headCx = x + s * 0.6
+  const headCy = y + s * 0.4
+  const headR = s * 0.24
 
-  // Exhaust flame (behind, to the left), with a little flicker
-  const flick = 0.75 + Math.random() * 0.35
-  ctx.fillStyle = '#fb923c'
-  ctx.beginPath()
-  ctx.moveTo(bx0, cy - bh * 0.32)
-  ctx.lineTo(x - s * 0.26 * flick, cy)
-  ctx.lineTo(bx0, cy + bh * 0.32)
-  ctx.closePath()
-  ctx.fill()
-  ctx.fillStyle = '#fde68a'
-  ctx.beginPath()
-  ctx.moveTo(bx0, cy - bh * 0.18)
-  ctx.lineTo(x - s * 0.12 * flick, cy)
-  ctx.lineTo(bx0, cy + bh * 0.18)
-  ctx.closePath()
-  ctx.fill()
-
-  // Fins
-  ctx.fillStyle = '#0369a1'
-  ctx.beginPath()
-  ctx.moveTo(bx0 + s * 0.14, cy - bh * 0.4)
-  ctx.lineTo(bx0 - s * 0.02, cy - bh * 0.9)
-  ctx.lineTo(bx0 + s * 0.3, cy - bh * 0.4)
-  ctx.closePath()
-  ctx.fill()
-  ctx.beginPath()
-  ctx.moveTo(bx0 + s * 0.14, cy + bh * 0.4)
-  ctx.lineTo(bx0 - s * 0.02, cy + bh * 0.9)
-  ctx.lineTo(bx0 + s * 0.3, cy + bh * 0.4)
-  ctx.closePath()
-  ctx.fill()
-
-  // Body
-  ctx.fillStyle = '#e2e8f0'
-  ctx.beginPath()
-  ctx.ellipse((bx0 + bx1) / 2, cy, (bx1 - bx0) / 2, bh / 2, 0, 0, Math.PI * 2)
-  ctx.fill()
-
-  // Nose cone
-  ctx.fillStyle = '#0ea5e9'
-  ctx.beginPath()
-  ctx.moveTo(bx1 - s * 0.02, cy - bh * 0.5)
-  ctx.lineTo(x + s * 0.98, cy)
-  ctx.lineTo(bx1 - s * 0.02, cy + bh * 0.5)
-  ctx.closePath()
-  ctx.fill()
-
-  // Window
-  ctx.fillStyle = '#0c4a6e'
-  ctx.beginPath()
-  ctx.arc(x + s * 0.52, cy, s * 0.1, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.fillStyle = '#7dd3fc'
-  ctx.beginPath()
-  ctx.arc(x + s * 0.52, cy, s * 0.06, 0, Math.PI * 2)
-  ctx.fill()
-}
-
-function drawBug(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
-  const cx = x + s * 0.52
-  const cy = y + s * 0.54
-  const rx = s * 0.36
-  const ry = s * 0.3
-
-  // Legs
-  ctx.strokeStyle = '#1f2937'
-  ctx.lineWidth = Math.max(1, s * 0.05)
+  // Tail (behind, sweeping up-left)
+  ctx.strokeStyle = gray
+  ctx.lineWidth = s * 0.12
   ctx.lineCap = 'round'
-  for (const dx of [-0.5, 0, 0.5]) {
-    ctx.beginPath()
-    ctx.moveTo(cx + rx * dx * 0.7, cy)
-    ctx.lineTo(cx + rx * dx * 0.7 - s * 0.12, cy + s * 0.28)
-    ctx.stroke()
-    ctx.beginPath()
-    ctx.moveTo(cx + rx * dx * 0.7, cy)
-    ctx.lineTo(cx + rx * dx * 0.7 + s * 0.12, cy + s * 0.28)
-    ctx.stroke()
-  }
-
-  // Shell
-  ctx.fillStyle = '#ef4444'
   ctx.beginPath()
-  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2)
-  ctx.fill()
-
-  // Center line
-  ctx.strokeStyle = '#1f2937'
-  ctx.lineWidth = Math.max(1, s * 0.045)
-  ctx.beginPath()
-  ctx.moveTo(cx, cy - ry)
-  ctx.lineTo(cx, cy + ry)
+  ctx.moveTo(x + s * 0.18, y + s * 0.72)
+  ctx.quadraticCurveTo(x - s * 0.04, y + s * 0.56, x + s * 0.06, y + s * 0.32)
   ctx.stroke()
 
-  // Spots
-  ctx.fillStyle = '#1f2937'
-  for (const [sx, sy] of [
-    [-0.42, -0.25],
-    [0.42, -0.25],
-    [-0.42, 0.3],
-    [0.42, 0.3],
-  ] as const) {
+  // Body + paws
+  ctx.fillStyle = gray
+  ctx.beginPath()
+  ctx.ellipse(x + s * 0.44, y + s * 0.68, s * 0.3, s * 0.26, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.ellipse(x + s * 0.36, y + s * 0.92, s * 0.09, s * 0.06, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.ellipse(x + s * 0.58, y + s * 0.92, s * 0.09, s * 0.06, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Ears (outer)
+  ctx.fillStyle = gray
+  ctx.beginPath()
+  ctx.moveTo(headCx - s * 0.2, headCy - s * 0.12)
+  ctx.lineTo(headCx - s * 0.28, headCy - s * 0.4)
+  ctx.lineTo(headCx - s * 0.02, headCy - s * 0.24)
+  ctx.closePath()
+  ctx.fill()
+  ctx.beginPath()
+  ctx.moveTo(headCx + s * 0.2, headCy - s * 0.12)
+  ctx.lineTo(headCx + s * 0.28, headCy - s * 0.4)
+  ctx.lineTo(headCx + s * 0.02, headCy - s * 0.24)
+  ctx.closePath()
+  ctx.fill()
+  // Ears (inner pink)
+  ctx.fillStyle = '#f9a8d4'
+  ctx.beginPath()
+  ctx.moveTo(headCx - s * 0.17, headCy - s * 0.16)
+  ctx.lineTo(headCx - s * 0.22, headCy - s * 0.33)
+  ctx.lineTo(headCx - s * 0.07, headCy - s * 0.22)
+  ctx.closePath()
+  ctx.fill()
+  ctx.beginPath()
+  ctx.moveTo(headCx + s * 0.17, headCy - s * 0.16)
+  ctx.lineTo(headCx + s * 0.22, headCy - s * 0.33)
+  ctx.lineTo(headCx + s * 0.07, headCy - s * 0.22)
+  ctx.closePath()
+  ctx.fill()
+
+  // Head
+  ctx.fillStyle = gray
+  ctx.beginPath()
+  ctx.arc(headCx, headCy, headR, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Tabby stripes
+  ctx.strokeStyle = dark
+  ctx.lineWidth = s * 0.04
+  ctx.beginPath()
+  ctx.moveTo(headCx, headCy - headR)
+  ctx.lineTo(headCx, headCy - headR * 0.35)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(headCx + s * 0.1, headCy - headR * 0.95)
+  ctx.lineTo(headCx + s * 0.08, headCy - headR * 0.35)
+  ctx.stroke()
+
+  // Eyes + nose
+  ctx.fillStyle = '#0f172a'
+  ctx.beginPath()
+  ctx.arc(headCx - s * 0.07, headCy - s * 0.01, s * 0.045, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(headCx + s * 0.09, headCy - s * 0.01, s * 0.045, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#f472b6'
+  ctx.beginPath()
+  ctx.arc(headCx + s * 0.01, headCy + s * 0.07, s * 0.03, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Whiskers
+  ctx.strokeStyle = 'rgba(226,232,240,0.85)'
+  ctx.lineWidth = Math.max(1, s * 0.02)
+  for (const dy of [-0.01, 0.05]) {
     ctx.beginPath()
-    ctx.arc(cx + rx * sx, cy + ry * sy, s * 0.06, 0, Math.PI * 2)
-    ctx.fill()
+    ctx.moveTo(headCx + s * 0.06, headCy + s * dy)
+    ctx.lineTo(headCx + s * 0.3, headCy + s * (dy - 0.03))
+    ctx.stroke()
   }
 
-  // Head (front, facing left toward the player)
-  ctx.fillStyle = '#111827'
+  // Raised paw holding the wrench
+  ctx.fillStyle = gray
   ctx.beginPath()
-  ctx.arc(x + s * 0.14, cy, s * 0.15, 0, Math.PI * 2)
+  ctx.arc(x + s * 0.3, y + s * 0.44, s * 0.08, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Wrench (brand blue): handle + open-jaw head
+  ctx.strokeStyle = '#38bdf8'
+  ctx.lineWidth = s * 0.08
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  ctx.moveTo(x + s * 0.3, y + s * 0.44)
+  ctx.lineTo(x + s * 0.14, y + s * 0.16)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(x + s * 0.1, y + s * 0.1, s * 0.08, Math.PI * 0.35, Math.PI * 2)
+  ctx.stroke()
+}
+
+// A menacing "software bug" — a beetle (the original bug!) with antennae,
+// segmented carapace, six legs and angry red eyes. Faces left, toward the cat.
+function drawBug(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
+  const cy = y + s * 0.54
+
+  // Legs (three per side, angled)
+  ctx.strokeStyle = '#0b1220'
+  ctx.lineWidth = Math.max(1, s * 0.06)
+  ctx.lineCap = 'round'
+  for (const lx of [0.34, 0.56, 0.78]) {
+    const bx = x + s * lx
+    ctx.beginPath()
+    ctx.moveTo(bx, cy)
+    ctx.lineTo(bx - s * 0.12, cy + s * 0.3)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(bx, cy)
+    ctx.lineTo(bx + s * 0.12, cy + s * 0.3)
+    ctx.stroke()
+  }
+
+  // Antennae
+  ctx.lineWidth = Math.max(1, s * 0.045)
+  ctx.beginPath()
+  ctx.moveTo(x + s * 0.2, cy - s * 0.1)
+  ctx.quadraticCurveTo(x + s * 0.02, cy - s * 0.36, x - s * 0.04, cy - s * 0.22)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(x + s * 0.26, cy - s * 0.12)
+  ctx.quadraticCurveTo(x + s * 0.12, cy - s * 0.44, x + s * 0.04, cy - s * 0.32)
+  ctx.stroke()
+
+  // Carapace (shell) with shading
+  ctx.fillStyle = '#22c55e'
+  ctx.beginPath()
+  ctx.ellipse(x + s * 0.58, cy, s * 0.34, s * 0.3, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#16a34a'
+  ctx.beginPath()
+  ctx.ellipse(x + s * 0.58, cy + s * 0.07, s * 0.34, s * 0.22, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Wing seam + highlights
+  ctx.strokeStyle = '#0f5132'
+  ctx.lineWidth = Math.max(1, s * 0.05)
+  ctx.beginPath()
+  ctx.moveTo(x + s * 0.58, cy - s * 0.28)
+  ctx.lineTo(x + s * 0.58, cy + s * 0.28)
+  ctx.stroke()
+  ctx.fillStyle = 'rgba(220,252,231,0.7)'
+  ctx.beginPath()
+  ctx.arc(x + s * 0.48, cy - s * 0.1, s * 0.04, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(x + s * 0.7, cy - s * 0.08, s * 0.04, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Head (front-left) + angry eyes
+  ctx.fillStyle = '#15803d'
+  ctx.beginPath()
+  ctx.arc(x + s * 0.22, cy, s * 0.17, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#f87171'
+  ctx.beginPath()
+  ctx.arc(x + s * 0.17, cy - s * 0.04, s * 0.05, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(x + s * 0.3, cy - s * 0.04, s * 0.05, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#450a0a'
+  ctx.beginPath()
+  ctx.arc(x + s * 0.17, cy - s * 0.04, s * 0.02, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(x + s * 0.3, cy - s * 0.04, s * 0.02, 0, Math.PI * 2)
   ctx.fill()
 }
 
@@ -411,9 +488,9 @@ export default function RunnerGame() {
         }
       }
 
-      // Player (rocket shipping code)
+      // Player: "DevOps" the cat with a wrench
       const bob = s.grounded && s.status === 'running' ? Math.sin(Date.now() / 90) * 1.5 : 0
-      drawRocket(ctx, PLAYER_X, s.playerY + bob, PLAYER_W)
+      drawDevOpsCat(ctx, PLAYER_X, s.playerY + bob, PLAYER_W)
 
       // HUD score
       ctx.fillStyle = '#e2e8f0'
@@ -432,7 +509,7 @@ export default function RunnerGame() {
         ctx.fillText('SHIP IT!', WIDTH / 2, HEIGHT / 2 - 34)
         ctx.fillStyle = '#cbd5e1'
         ctx.font = '500 15px ui-monospace, SFMono-Regular, Menlo, monospace'
-        ctx.fillText('Jump the bugs. Ship the commits.', WIDTH / 2, HEIGHT / 2 + 2)
+        ctx.fillText('Play as DevOps the cat — jump the bugs, ship commits.', WIDTH / 2, HEIGHT / 2 + 2)
         ctx.fillStyle = 'rgba(148,163,184,0.9)'
         ctx.font = '500 13px ui-monospace, SFMono-Regular, Menlo, monospace'
         ctx.fillText('press SPACE / ↑  ·  or tap  ·  to deploy', WIDTH / 2, HEIGHT / 2 + 26)

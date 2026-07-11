@@ -198,7 +198,7 @@ export default function Terminal({ onPlay, onClassic }: TerminalProps) {
       case 'play':
       case 'game':
       case 'start':
-        print([<span className="text-slate-400">launching Ship It!… good luck 🚀</span>])
+        print([<span className="text-slate-400">launching Ship It!… grab your wrench, DevOps 🐱🔧</span>])
         onPlay()
         break
       case 'classic':
