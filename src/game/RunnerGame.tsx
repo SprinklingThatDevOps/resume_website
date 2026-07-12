@@ -20,7 +20,14 @@ const SPEED_RAMP = 12 // px/s added per second survived
 const RESTART_COOLDOWN = 700 // ms; prevents an accidental instant restart on death
 const HISCORE_KEY = 'ship_it_hiscore'
 
-type Obstacle = { x: number; count: number; w: number }
+type Obstacle = {
+  x: number
+  count: number
+  w: number
+  kind: 'ground' | 'air'
+  emoji: string
+  bob: number
+}
 
 type Status = 'idle' | 'running' | 'over'
 
@@ -43,6 +50,15 @@ const PLAYER_X = 66
 const PLAYER_W = 32
 const PLAYER_H = 34
 const OBST_UNIT = 26
+
+// Flying "incident" obstacles: they cruise at head height, so you dodge them
+// by staying on the ground (don't jump into them). They unlock partway into a
+// run to keep the opening gentle and ramp the difficulty.
+const AIR_UNLOCK = 150 // commits before flyers start appearing
+const AIR_TOP = GROUND_Y - 74
+const AIR_H = 22
+const BUG_EMOJI = '\uD83D\uDC1B' // 🐛
+const FLYER_EMOJIS = ['\uD83D\uDEA8', '\uD83D\uDCDF'] // 🚨 incident siren, 📟 pager
 
 function randBetween(a: number, b: number) {
   return a + Math.random() * (b - a)
@@ -163,8 +179,28 @@ export default function RunnerGame() {
 
     const spawn = () => {
       const s = g.current
-      const count = Math.random() < 0.28 ? 2 : 1
-      s.obstacles.push({ x: WIDTH + 10, count, w: count * OBST_UNIT })
+      const flyer = s.score >= AIR_UNLOCK && Math.random() < 0.4
+      if (flyer) {
+        const emoji = FLYER_EMOJIS[Math.floor(Math.random() * FLYER_EMOJIS.length)]
+        s.obstacles.push({
+          x: WIDTH + 10,
+          count: 1,
+          w: OBST_UNIT,
+          kind: 'air',
+          emoji,
+          bob: Math.random() * Math.PI * 2,
+        })
+      } else {
+        const count = Math.random() < 0.28 ? 2 : 1
+        s.obstacles.push({
+          x: WIDTH + 10,
+          count,
+          w: count * OBST_UNIT,
+          kind: 'ground',
+          emoji: BUG_EMOJI,
+          bob: 0,
+        })
+      }
     }
 
     const drawEmoji = (emoji: string, x: number, y: number, size: number) => {
@@ -210,12 +246,13 @@ export default function RunnerGame() {
       const obH = 22
       for (const o of s.obstacles) {
         const ox = o.x + 3
-        const oy = GROUND_Y - obH
         const ow = o.w - 6
+        const oy = o.kind === 'air' ? AIR_TOP : GROUND_Y - obH
+        const oh = o.kind === 'air' ? AIR_H : obH
         if (
           px < ox + ow &&
           px + pw > ox &&
-          py < oy + obH &&
+          py < oy + oh &&
           py + ph > oy
         ) {
           endGame()
@@ -266,10 +303,15 @@ export default function RunnerGame() {
         ctx.stroke()
       }
 
-      // Obstacles (bugs)
+      // Obstacles: ground bugs (jump over) + flying incidents (don't jump into)
       for (const o of s.obstacles) {
-        for (let i = 0; i < o.count; i++) {
-          drawEmoji('\uD83D\uDC1B', o.x + i * OBST_UNIT, GROUND_Y - 24, 24)
+        if (o.kind === 'air') {
+          const fb = Math.sin(Date.now() / 180 + o.bob) * 4
+          drawEmoji(o.emoji, o.x, AIR_TOP - 2 + fb, 24)
+        } else {
+          for (let i = 0; i < o.count; i++) {
+            drawEmoji(o.emoji, o.x + i * OBST_UNIT, GROUND_Y - 24, 24)
+          }
         }
       }
 
@@ -297,7 +339,8 @@ export default function RunnerGame() {
         ctx.fillText('Jump the bugs. Ship the commits.', WIDTH / 2, HEIGHT / 2 + 2)
         ctx.fillStyle = 'rgba(148,163,184,0.9)'
         ctx.font = '500 13px ui-monospace, SFMono-Regular, Menlo, monospace'
-        ctx.fillText('press SPACE / ↑  ·  or tap  ·  to deploy', WIDTH / 2, HEIGHT / 2 + 26)
+        ctx.fillText('flying incidents come in high — stay down, don\u2019t jump into them', WIDTH / 2, HEIGHT / 2 + 24)
+        ctx.fillText('press SPACE / ↑  ·  or tap  ·  to deploy', WIDTH / 2, HEIGHT / 2 + 44)
       } else if (s.status === 'over') {
         ctx.fillStyle = 'rgba(2,6,23,0.55)'
         ctx.fillRect(0, 0, WIDTH, HEIGHT)
