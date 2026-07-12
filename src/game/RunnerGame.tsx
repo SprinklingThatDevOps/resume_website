@@ -20,7 +20,14 @@ const SPEED_RAMP = 12 // px/s added per second survived
 const RESTART_COOLDOWN = 700 // ms; prevents an accidental instant restart on death
 const HISCORE_KEY = 'ship_it_hiscore'
 
-type Obstacle = { x: number; count: number; w: number }
+type Obstacle = {
+  x: number
+  count: number
+  w: number
+  kind: 'ground' | 'air'
+  emoji: string
+  bob: number
+}
 type CatPickup = { x: number; y: number; emoji: string; phase: number }
 type CatPounce = { x: number; y: number; t: number }
 
@@ -51,6 +58,16 @@ const PLAYER_X = 66
 const PLAYER_W = 32
 const PLAYER_H = 34
 const OBST_UNIT = 26
+
+// Flying "incident" obstacles: on-call sirens/pagers that cruise at head
+// height, so you dodge them by staying grounded (jumping into one ends the
+// run). They unlock partway into a run to keep the opening gentle.
+const AIR_UNLOCK = 150 // commits before flyers start appearing
+const AIR_TOP = GROUND_Y - 74
+const AIR_H = 22
+const BUG_EMOJI = '\uD83D\uDC1B' // 🐛
+const FLYER_EMOJIS = ['\uD83D\uDEA8', '\uD83D\uDCDF'] // 🚨 incident siren, 📟 pager
+
 const CAT_W = 30
 const CAT_H = 26
 const MAX_CAT_CHARGES = 3
@@ -261,8 +278,28 @@ export default function RunnerGame() {
 
     const spawn = () => {
       const s = g.current
-      const count = Math.random() < 0.28 ? 2 : 1
-      s.obstacles.push({ x: WIDTH + 10, count, w: count * OBST_UNIT })
+      const flyer = s.score >= AIR_UNLOCK && Math.random() < 0.4
+      if (flyer) {
+        const emoji = FLYER_EMOJIS[Math.floor(Math.random() * FLYER_EMOJIS.length)]
+        s.obstacles.push({
+          x: WIDTH + 10,
+          count: 1,
+          w: OBST_UNIT,
+          kind: 'air',
+          emoji,
+          bob: Math.random() * Math.PI * 2,
+        })
+      } else {
+        const count = Math.random() < 0.28 ? 2 : 1
+        s.obstacles.push({
+          x: WIDTH + 10,
+          count,
+          w: count * OBST_UNIT,
+          kind: 'ground',
+          emoji: BUG_EMOJI,
+          bob: 0,
+        })
+      }
     }
 
     const spawnCat = () => {
@@ -352,22 +389,26 @@ export default function RunnerGame() {
       for (const o of s.obstacles) o.x -= s.speed * dt
       s.obstacles = s.obstacles.filter((o) => o.x + o.w > -10)
 
-      // Collision (AABB with a little forgiveness)
-      const obH = 22
+      // Collision (AABB with a little forgiveness). Ground bugs sit on the
+      // floor; flying incidents occupy a head-height band.
       for (const o of s.obstacles) {
         const obstacleBox = {
           x: o.x + 3,
-          y: GROUND_Y - obH,
+          y: o.kind === 'air' ? AIR_TOP : GROUND_Y - 22,
           w: o.w - 6,
-          h: obH,
+          h: o.kind === 'air' ? AIR_H : 22,
         }
         if (intersects(playerBox, obstacleBox)) {
           if (s.catCharges > 0) {
             s.catCharges -= 1
             s.score += 25
-            s.catPounce = { x: o.x - 6, y: GROUND_Y - 46, t: 0.55 }
+            s.catPounce = { x: o.x - 6, y: (o.kind === 'air' ? AIR_TOP : GROUND_Y - 46), t: 0.55 }
             setCatCharges(s.catCharges)
-            setCatMessage('CatOps swatted a production bug. +25 commits.')
+            setCatMessage(
+              o.kind === 'air'
+                ? 'CatOps paged back the incident. +25 commits.'
+                : 'CatOps swatted a production bug. +25 commits.',
+            )
             s.obstacles = s.obstacles.filter((item) => item !== o)
             break
           }
@@ -419,10 +460,15 @@ export default function RunnerGame() {
         ctx.stroke()
       }
 
-      // Obstacles (bugs)
+      // Obstacles: ground bugs (jump over) + flying incidents (don't jump into)
       for (const o of s.obstacles) {
-        for (let i = 0; i < o.count; i++) {
-          drawEmoji('\uD83D\uDC1B', o.x + i * OBST_UNIT, GROUND_Y - 24, 24)
+        if (o.kind === 'air') {
+          const fb = Math.sin(Date.now() / 180 + o.bob) * 4
+          drawEmoji(o.emoji, o.x, AIR_TOP - 2 + fb, 24)
+        } else {
+          for (let i = 0; i < o.count; i++) {
+            drawEmoji(o.emoji, o.x + i * OBST_UNIT, GROUND_Y - 24, 24)
+          }
         }
       }
 
@@ -484,11 +530,12 @@ export default function RunnerGame() {
         ctx.fillText('SHIP IT!', WIDTH / 2, HEIGHT / 2 - 34)
         ctx.fillStyle = '#cbd5e1'
         ctx.font = '500 15px ui-monospace, SFMono-Regular, Menlo, monospace'
-        ctx.fillText('Jump the bugs. Recruit CatOps. Ship the commits.', WIDTH / 2, HEIGHT / 2 + 2)
+        ctx.fillText('Jump the bugs. Recruit CatOps. Ship the commits.', WIDTH / 2, HEIGHT / 2 - 6)
         ctx.fillStyle = 'rgba(148,163,184,0.9)'
         ctx.font = '500 13px ui-monospace, SFMono-Regular, Menlo, monospace'
-        ctx.fillText('collect cats for one emergency bug swat', WIDTH / 2, HEIGHT / 2 + 26)
-        ctx.fillText('press SPACE / ↑  ·  or tap  ·  to deploy', WIDTH / 2, HEIGHT / 2 + 46)
+        ctx.fillText('flying incidents come in high — stay grounded, don\u2019t jump into them', WIDTH / 2, HEIGHT / 2 + 16)
+        ctx.fillText('collect cats for one emergency bug swat', WIDTH / 2, HEIGHT / 2 + 34)
+        ctx.fillText('press SPACE / ↑  ·  or tap  ·  to deploy', WIDTH / 2, HEIGHT / 2 + 52)
       } else if (s.status === 'over') {
         ctx.fillStyle = 'rgba(2,6,23,0.55)'
         ctx.fillRect(0, 0, WIDTH, HEIGHT)
