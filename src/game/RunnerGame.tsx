@@ -76,7 +76,7 @@ const OBST_UNIT = 26
 
 // Flying DevSecOps hazards cruise at head height — stay grounded to dodge.
 // They unlock partway into a run to keep the opening gentle.
-const AIR_UNLOCK = 150 // commits before flyers start appearing
+const AIR_UNLOCK = 100 // commits before flyers start appearing
 const AIR_TOP = GROUND_Y - 74
 const AIR_H = 22
 const FLYER_KINDS: FlyerKind[] = ['siren', 'pager', 'cve', 'policy', 'cert', 'secret']
@@ -588,13 +588,16 @@ export default function RunnerGame() {
       ctx.textAlign = 'left'
       ctx.fillStyle = s.catCharges > 0 ? '#fbbf24' : 'rgba(148,163,184,0.72)'
       ctx.font = `700 ${hudSmall}px ui-monospace, SFMono-Regular, Menlo, monospace`
-      ctx.fillText('catops', 16, 12)
+      const catopsLabel = 'catops'
+      ctx.fillText(catopsLabel, 16, 12)
+      const catopsLabelW = ctx.measureText(catopsLabel).width
+      const catopsIconX = 16 + catopsLabelW + 10
       for (let i = 0; i < s.catCharges; i++) {
-        drawCat(ctx, 78 + i * 22, 8, 18, true)
+        drawCat(ctx, catopsIconX + i * 22, 8, 18, true)
       }
       if (s.catCharges === 0) {
         ctx.fillStyle = 'rgba(148,163,184,0.72)'
-        ctx.fillText('standby', 78, 12)
+        ctx.fillText('standby', catopsIconX, 12)
       }
 
       if (s.catMessageTimer > 0 && s.catMessage) {
