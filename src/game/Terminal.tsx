@@ -283,7 +283,7 @@ export default function Terminal({ onPlay, onClassic }: TerminalProps) {
 
   return (
     <div
-      className="flex h-[52vh] min-h-[320px] flex-col bg-slate-950/70 p-4 font-mono text-sm sm:text-[15px]"
+      className="flex h-[min(52vh,520px)] min-h-[240px] flex-col bg-slate-950/70 p-3 font-mono text-sm sm:min-h-[320px] sm:p-4 sm:text-[15px]"
       onClick={() => inputRef.current?.focus()}
     >
       <div ref={scrollRef} className="flex-1 overflow-y-auto pr-1">
