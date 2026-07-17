@@ -1,4 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  drawBug,
+  drawCat,
+  drawCloud,
+  drawFlyer,
+  drawRocket,
+  drawWarning,
+  type FlyerKind,
+} from './sprites'
 
 /**
  * "Ship It!" — a Chrome-dino-style endless runner themed around shipping code
@@ -7,6 +16,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  * The whole simulation runs inside a single requestAnimationFrame loop using
  * refs (so we don't re-render React 60x/sec). React state is only used for the
  * high score badge and the current status, updated on discrete events.
+ *
+ * Sprites are drawn with canvas primitives (not emoji) so they render reliably
+ * on mobile browsers. Touch gets a large jump control and scroll lock while
+ * the finger is on the playfield.
  */
 
 const WIDTH = 800
@@ -19,16 +32,17 @@ const MAX_SPEED = 740
 const SPEED_RAMP = 12 // px/s added per second survived
 const RESTART_COOLDOWN = 700 // ms; prevents an accidental instant restart on death
 const HISCORE_KEY = 'ship_it_hiscore'
+const NARROW_CSS_PX = 520 // below this CSS width, bump HUD/overlay fonts
 
 type Obstacle = {
   x: number
   count: number
   w: number
   kind: 'ground' | 'air'
-  emoji: string
+  flyer?: FlyerKind
   bob: number
 }
-type CatPickup = { x: number; y: number; emoji: string; phase: number }
+type CatPickup = { x: number; y: number; dark: boolean; phase: number }
 type CatPounce = { x: number; y: number; t: number }
 
 type Status = 'idle' | 'running' | 'over'
@@ -52,6 +66,7 @@ type GameRefs = {
   clouds: { x: number; y: number; s: number }[]
   last: number
   overAt: number
+  narrow: boolean
 }
 
 const PLAYER_X = 66
@@ -59,14 +74,20 @@ const PLAYER_W = 32
 const PLAYER_H = 34
 const OBST_UNIT = 26
 
-// Flying "incident" obstacles: on-call sirens/pagers that cruise at head
-// height, so you dodge them by staying grounded (jumping into one ends the
-// run). They unlock partway into a run to keep the opening gentle.
+// Flying DevSecOps hazards cruise at head height — stay grounded to dodge.
+// They unlock partway into a run to keep the opening gentle.
 const AIR_UNLOCK = 150 // commits before flyers start appearing
 const AIR_TOP = GROUND_Y - 74
 const AIR_H = 22
-const BUG_EMOJI = '\uD83D\uDC1B' // 🐛
-const FLYER_EMOJIS = ['\uD83D\uDEA8', '\uD83D\uDCDF'] // 🚨 incident siren, 📟 pager
+const FLYER_KINDS: FlyerKind[] = ['siren', 'pager', 'cve', 'policy', 'cert', 'secret']
+const FLYER_SWAT_LABEL: Record<FlyerKind, string> = {
+  siren: 'CatOps silenced the incident siren. +25 commits.',
+  pager: 'CatOps ack\'d the pager. +25 commits.',
+  cve: 'CatOps patched the critical CVE. +25 commits.',
+  policy: 'CatOps cleared the policy DENY. +25 commits.',
+  cert: 'CatOps renewed the expired TLS cert. +25 commits.',
+  secret: 'CatOps rotated the leaked secret. +25 commits.',
+}
 
 const CAT_W = 30
 const CAT_H = 26
@@ -88,8 +109,34 @@ function readHiScore(): number {
   return Number.isNaN(stored) ? 0 : stored
 }
 
+function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+) {
+  const words = text.split(' ')
+  let line = ''
+  let yy = y
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word
+    if (ctx.measureText(test).width > maxWidth && line) {
+      ctx.fillText(line, x, yy)
+      line = word
+      yy += lineHeight
+    } else {
+      line = test
+    }
+  }
+  if (line) ctx.fillText(line, x, yy)
+  return yy
+}
+
 export default function RunnerGame() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const wrapRef = useRef<HTMLDivElement | null>(null)
   const rafRef = useRef<number>(0)
   const audioRef = useRef<AudioContext | null>(null)
   const [status, setStatus] = useState<Status>('idle')
@@ -98,6 +145,7 @@ export default function RunnerGame() {
   const [lastScore, setLastScore] = useState(0)
   const [catCharges, setCatCharges] = useState(0)
   const [catNote, setCatNote] = useState('CatOps may join mid-run. Cats swat bugs; rockets ship code.')
+  const [coarsePointer, setCoarsePointer] = useState(false)
 
   const getAudioContext = useCallback(() => {
     const AudioContextCtor =
@@ -160,6 +208,14 @@ export default function RunnerGame() {
     }
   }, [])
 
+  useEffect(() => {
+    const mq = window.matchMedia('(pointer: coarse)')
+    const sync = () => setCoarsePointer(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+
   const g = useRef<GameRefs>({
     status: 'idle',
     playerY: GROUND_Y - PLAYER_H,
@@ -183,6 +239,7 @@ export default function RunnerGame() {
     ],
     last: 0,
     overAt: 0,
+    narrow: false,
   })
 
   useEffect(() => {
@@ -233,7 +290,7 @@ export default function RunnerGame() {
     }
   }, [primeCatOpsAudio, start])
 
-  // Input handling
+  // Keyboard input
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (
@@ -250,6 +307,19 @@ export default function RunnerGame() {
     return () => window.removeEventListener('keydown', onKey)
   }, [jump])
 
+  // Lock page scroll while a finger is on the playfield (iOS Safari otherwise
+  // rubber-bands / zooms and steals the tap).
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+
+    const blockScroll = (e: TouchEvent) => {
+      e.preventDefault()
+    }
+    el.addEventListener('touchmove', blockScroll, { passive: false })
+    return () => el.removeEventListener('touchmove', blockScroll)
+  }, [])
+
   // Main loop
   useEffect(() => {
     const canvas = canvasRef.current
@@ -260,7 +330,15 @@ export default function RunnerGame() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
     canvas.width = WIDTH * dpr
     canvas.height = HEIGHT * dpr
-    ctx.scale(dpr, dpr)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+    const syncNarrow = () => {
+      g.current.narrow = canvas.clientWidth > 0 && canvas.clientWidth < NARROW_CSS_PX
+    }
+    syncNarrow()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncNarrow) : null
+    ro?.observe(canvas)
+    window.addEventListener('resize', syncNarrow)
 
     const endGame = () => {
       const s = g.current
@@ -278,15 +356,15 @@ export default function RunnerGame() {
 
     const spawn = () => {
       const s = g.current
-      const flyer = s.score >= AIR_UNLOCK && Math.random() < 0.4
+      const flyer = s.score >= AIR_UNLOCK && Math.random() < 0.42
       if (flyer) {
-        const emoji = FLYER_EMOJIS[Math.floor(Math.random() * FLYER_EMOJIS.length)]
+        const kind = FLYER_KINDS[Math.floor(Math.random() * FLYER_KINDS.length)]
         s.obstacles.push({
           x: WIDTH + 10,
           count: 1,
-          w: OBST_UNIT,
+          w: OBST_UNIT + 4,
           kind: 'air',
-          emoji,
+          flyer: kind,
           bob: Math.random() * Math.PI * 2,
         })
       } else {
@@ -296,7 +374,6 @@ export default function RunnerGame() {
           count,
           w: count * OBST_UNIT,
           kind: 'ground',
-          emoji: BUG_EMOJI,
           bob: 0,
         })
       }
@@ -308,7 +385,7 @@ export default function RunnerGame() {
       s.catPickups.push({
         x: WIDTH + randBetween(20, 70),
         y: GROUND_Y - CAT_H - 4,
-        emoji: Math.random() < 0.55 ? '\uD83D\uDC08\u200D\u2B1B' : '\uD83D\uDC08',
+        dark: Math.random() < 0.55,
         phase: Math.random() * Math.PI * 2,
       })
     }
@@ -318,13 +395,6 @@ export default function RunnerGame() {
       s.catMessage = message
       s.catMessageTimer = 1.75
       setCatNote(message)
-    }
-
-    const drawEmoji = (emoji: string, x: number, y: number, size: number) => {
-      ctx.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`
-      ctx.textAlign = 'left'
-      ctx.textBaseline = 'top'
-      ctx.fillText(emoji, x, y)
     }
 
     const update = (dt: number) => {
@@ -390,7 +460,7 @@ export default function RunnerGame() {
       s.obstacles = s.obstacles.filter((o) => o.x + o.w > -10)
 
       // Collision (AABB with a little forgiveness). Ground bugs sit on the
-      // floor; flying incidents occupy a head-height band.
+      // floor; flying DevSecOps hazards occupy a head-height band.
       for (const o of s.obstacles) {
         const obstacleBox = {
           x: o.x + 3,
@@ -402,11 +472,16 @@ export default function RunnerGame() {
           if (s.catCharges > 0) {
             s.catCharges -= 1
             s.score += 25
-            s.catPounce = { x: o.x - 6, y: (o.kind === 'air' ? AIR_TOP : GROUND_Y - 46), t: 0.55 }
+            s.catPounce = {
+              x: o.x - 6,
+              y: o.kind === 'air' ? AIR_TOP : GROUND_Y - 46,
+              t: 0.55,
+            }
             setCatCharges(s.catCharges)
+            const flyer = o.flyer
             setCatMessage(
-              o.kind === 'air'
-                ? 'CatOps paged back the incident. +25 commits.'
+              o.kind === 'air' && flyer
+                ? FLYER_SWAT_LABEL[flyer]
                 : 'CatOps swatted a production bug. +25 commits.',
             )
             s.obstacles = s.obstacles.filter((item) => item !== o)
@@ -431,6 +506,13 @@ export default function RunnerGame() {
 
     const render = () => {
       const s = g.current
+      const narrow = s.narrow
+      // Logical fonts that survive CSS shrink on phones (800→~360px ≈ 0.45×).
+      const hudSize = narrow ? 22 : 16
+      const hudSmall = narrow ? 18 : 13
+      const titleSize = narrow ? 36 : 30
+      const bodySize = narrow ? 18 : 15
+      const hintSize = narrow ? 16 : 13
 
       // Background
       const grad = ctx.createLinearGradient(0, 0, 0, HEIGHT)
@@ -440,9 +522,7 @@ export default function RunnerGame() {
       ctx.fillRect(0, 0, WIDTH, HEIGHT)
 
       // Clouds (parallax)
-      ctx.globalAlpha = 0.5
-      for (const c of s.clouds) drawEmoji('\u2601\uFE0F', c.x, c.y, 22)
-      ctx.globalAlpha = 1
+      for (const c of s.clouds) drawCloud(ctx, c.x, c.y, 34)
 
       // Ground line + moving dashes
       ctx.strokeStyle = 'rgba(148,163,184,0.35)'
@@ -460,14 +540,14 @@ export default function RunnerGame() {
         ctx.stroke()
       }
 
-      // Obstacles: ground bugs (jump over) + flying incidents (don't jump into)
+      // Obstacles: ground bugs (jump over) + flying DevSecOps hazards (don't jump into)
       for (const o of s.obstacles) {
-        if (o.kind === 'air') {
+        if (o.kind === 'air' && o.flyer) {
           const fb = Math.sin(Date.now() / 180 + o.bob) * 4
-          drawEmoji(o.emoji, o.x, AIR_TOP - 2 + fb, 24)
+          drawFlyer(ctx, o.flyer, o.x, AIR_TOP - 4 + fb, 28)
         } else {
           for (let i = 0; i < o.count; i++) {
-            drawEmoji(o.emoji, o.x + i * OBST_UNIT, GROUND_Y - 24, 24)
+            drawBug(ctx, o.x + i * OBST_UNIT, GROUND_Y - 24, 24)
           }
         }
       }
@@ -475,18 +555,18 @@ export default function RunnerGame() {
       // CatOps pickups and pounce effect
       for (const cat of s.catPickups) {
         const trot = Math.sin(Date.now() / 140 + cat.phase) * 1.5
-        drawEmoji(cat.emoji, cat.x, cat.y + trot, 24)
+        drawCat(ctx, cat.x, cat.y + trot, 26, cat.dark)
         ctx.fillStyle = 'rgba(251,191,36,0.82)'
-        ctx.font = '700 10px ui-monospace, SFMono-Regular, Menlo, monospace'
+        ctx.font = `700 ${narrow ? 12 : 10}px ui-monospace, SFMono-Regular, Menlo, monospace`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'top'
         ctx.fillText('catops', cat.x + 14, cat.y - 12 + trot)
       }
       if (s.catPounce) {
         const lift = Math.sin((1 - s.catPounce.t / 0.55) * Math.PI) * 18
-        drawEmoji('\uD83D\uDC08\u200D\u2B1B', s.catPounce.x, s.catPounce.y - lift, 28)
+        drawCat(ctx, s.catPounce.x, s.catPounce.y - lift, 30, true)
         ctx.fillStyle = 'rgba(251,191,36,0.95)'
-        ctx.font = '800 12px ui-monospace, SFMono-Regular, Menlo, monospace'
+        ctx.font = `800 ${narrow ? 14 : 12}px ui-monospace, SFMono-Regular, Menlo, monospace`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'top'
         ctx.fillText('MEOW-OPS', s.catPounce.x + 20, s.catPounce.y - lift - 16)
@@ -494,60 +574,90 @@ export default function RunnerGame() {
 
       // Player (rocket shipping code)
       const bob = s.grounded && s.status === 'running' ? Math.sin(Date.now() / 90) * 1.5 : 0
-      drawEmoji('\uD83D\uDE80', PLAYER_X, s.playerY + bob, 32)
+      drawRocket(ctx, PLAYER_X, s.playerY + bob, PLAYER_W)
 
       // HUD score
       ctx.fillStyle = '#e2e8f0'
-      ctx.font = '600 16px ui-monospace, SFMono-Regular, Menlo, monospace'
+      ctx.font = `600 ${hudSize}px ui-monospace, SFMono-Regular, Menlo, monospace`
       ctx.textAlign = 'right'
       ctx.textBaseline = 'top'
-      ctx.fillText(`commits ${String(Math.floor(s.score)).padStart(5, '0')}`, WIDTH - 16, 14)
+      ctx.fillText(`commits ${String(Math.floor(s.score)).padStart(5, '0')}`, WIDTH - 16, 12)
       ctx.fillStyle = 'rgba(148,163,184,0.8)'
-      ctx.fillText(`best ${String(hiScoreRef.current).padStart(5, '0')}`, WIDTH - 16, 34)
+      ctx.fillText(`best ${String(hiScoreRef.current).padStart(5, '0')}`, WIDTH - 16, 12 + hudSize + 4)
+
       ctx.textAlign = 'left'
       ctx.fillStyle = s.catCharges > 0 ? '#fbbf24' : 'rgba(148,163,184,0.72)'
-      ctx.font = '700 13px ui-monospace, SFMono-Regular, Menlo, monospace'
-      ctx.fillText(`catops ${s.catCharges > 0 ? '\uD83D\uDC08\u200D\u2B1B'.repeat(s.catCharges) : 'standby'}`, 16, 14)
+      ctx.font = `700 ${hudSmall}px ui-monospace, SFMono-Regular, Menlo, monospace`
+      ctx.fillText('catops', 16, 12)
+      for (let i = 0; i < s.catCharges; i++) {
+        drawCat(ctx, 78 + i * 22, 8, 18, true)
+      }
+      if (s.catCharges === 0) {
+        ctx.fillStyle = 'rgba(148,163,184,0.72)'
+        ctx.fillText('standby', 78, 12)
+      }
+
       if (s.catMessageTimer > 0 && s.catMessage) {
         ctx.globalAlpha = Math.min(1, s.catMessageTimer)
-        ctx.fillStyle = 'rgba(15,23,42,0.82)'
-        const msgWidth = Math.min(440, ctx.measureText(s.catMessage).width + 28)
-        ctx.fillRect(WIDTH / 2 - msgWidth / 2, 50, msgWidth, 28)
-        ctx.strokeStyle = 'rgba(251,191,36,0.35)'
-        ctx.strokeRect(WIDTH / 2 - msgWidth / 2, 50, msgWidth, 28)
-        ctx.fillStyle = '#fde68a'
+        ctx.font = `700 ${narrow ? 14 : 12}px ui-monospace, SFMono-Regular, Menlo, monospace`
         ctx.textAlign = 'center'
-        ctx.font = '700 12px ui-monospace, SFMono-Regular, Menlo, monospace'
-        ctx.fillText(s.catMessage, WIDTH / 2, 58)
+        ctx.textBaseline = 'top'
+        const msgWidth = Math.min(narrow ? 560 : 440, ctx.measureText(s.catMessage).width + 28)
+        const msgY = narrow ? 56 : 50
+        ctx.fillStyle = 'rgba(15,23,42,0.82)'
+        ctx.fillRect(WIDTH / 2 - msgWidth / 2, msgY, msgWidth, narrow ? 32 : 28)
+        ctx.strokeStyle = 'rgba(251,191,36,0.35)'
+        ctx.strokeRect(WIDTH / 2 - msgWidth / 2, msgY, msgWidth, narrow ? 32 : 28)
+        ctx.fillStyle = '#fde68a'
+        ctx.fillText(s.catMessage, WIDTH / 2, msgY + 8)
         ctx.globalAlpha = 1
       }
 
       // Overlays
       ctx.textAlign = 'center'
+      ctx.textBaseline = 'top'
       if (s.status === 'idle') {
         ctx.fillStyle = '#38bdf8'
-        ctx.font = '800 30px ui-monospace, SFMono-Regular, Menlo, monospace'
-        ctx.fillText('SHIP IT!', WIDTH / 2, HEIGHT / 2 - 34)
+        ctx.font = `800 ${titleSize}px ui-monospace, SFMono-Regular, Menlo, monospace`
+        ctx.fillText('SHIP IT!', WIDTH / 2, HEIGHT / 2 - (narrow ? 58 : 48))
         ctx.fillStyle = '#cbd5e1'
-        ctx.font = '500 15px ui-monospace, SFMono-Regular, Menlo, monospace'
-        ctx.fillText('Jump the bugs. Recruit CatOps. Ship the commits.', WIDTH / 2, HEIGHT / 2 - 6)
+        ctx.font = `500 ${bodySize}px ui-monospace, SFMono-Regular, Menlo, monospace`
+        wrapText(
+          ctx,
+          'Jump bugs. Duck CVEs, pagers & policy DENYs.',
+          WIDTH / 2,
+          HEIGHT / 2 - (narrow ? 18 : 10),
+          narrow ? 560 : 640,
+          bodySize + 4,
+        )
         ctx.fillStyle = 'rgba(148,163,184,0.9)'
-        ctx.font = '500 13px ui-monospace, SFMono-Regular, Menlo, monospace'
-        ctx.fillText('flying incidents come in high — stay grounded, don\u2019t jump into them', WIDTH / 2, HEIGHT / 2 + 16)
-        ctx.fillText('collect cats for one emergency bug swat', WIDTH / 2, HEIGHT / 2 + 34)
-        ctx.fillText('press SPACE / ↑  ·  or tap  ·  to deploy', WIDTH / 2, HEIGHT / 2 + 52)
+        ctx.font = `500 ${hintSize}px ui-monospace, SFMono-Regular, Menlo, monospace`
+        const hintY = HEIGHT / 2 + (narrow ? 28 : 24)
+        wrapText(
+          ctx,
+          narrow ? 'Tap to deploy · collect cats for one swat' : 'press SPACE / ↑  ·  or tap  ·  to deploy',
+          WIDTH / 2,
+          hintY,
+          narrow ? 560 : 640,
+          hintSize + 4,
+        )
       } else if (s.status === 'over') {
         ctx.fillStyle = 'rgba(2,6,23,0.55)'
         ctx.fillRect(0, 0, WIDTH, HEIGHT)
+        drawWarning(ctx, WIDTH / 2, HEIGHT / 2 - (narrow ? 72 : 62), narrow ? 18 : 15)
         ctx.fillStyle = '#f87171'
-        ctx.font = '800 26px ui-monospace, SFMono-Regular, Menlo, monospace'
-        ctx.fillText('\uD83D\uDEA8 ROLLBACK! Deploy failed.', WIDTH / 2, HEIGHT / 2 - 30)
+        ctx.font = `800 ${narrow ? 28 : 26}px ui-monospace, SFMono-Regular, Menlo, monospace`
+        ctx.fillText('ROLLBACK! Deploy failed.', WIDTH / 2, HEIGHT / 2 - 30)
         ctx.fillStyle = '#e2e8f0'
-        ctx.font = '600 16px ui-monospace, SFMono-Regular, Menlo, monospace'
+        ctx.font = `600 ${narrow ? 18 : 16}px ui-monospace, SFMono-Regular, Menlo, monospace`
         ctx.fillText(`${Math.floor(s.score)} commits shipped`, WIDTH / 2, HEIGHT / 2 + 2)
         ctx.fillStyle = 'rgba(148,163,184,0.9)'
-        ctx.font = '500 13px ui-monospace, SFMono-Regular, Menlo, monospace'
-        ctx.fillText('press SPACE / ↑ or tap to redeploy', WIDTH / 2, HEIGHT / 2 + 28)
+        ctx.font = `500 ${hintSize}px ui-monospace, SFMono-Regular, Menlo, monospace`
+        ctx.fillText(
+          narrow ? 'tap to redeploy' : 'press SPACE / ↑ or tap to redeploy',
+          WIDTH / 2,
+          HEIGHT / 2 + 28,
+        )
       }
     }
 
@@ -563,22 +673,59 @@ export default function RunnerGame() {
     }
     rafRef.current = requestAnimationFrame(frame)
 
-    return () => cancelAnimationFrame(rafRef.current)
+    return () => {
+      cancelAnimationFrame(rafRef.current)
+      ro?.disconnect()
+      window.removeEventListener('resize', syncNarrow)
+    }
   }, [playCatOpsMeow])
 
+  const onPlayPointer = (e: React.PointerEvent) => {
+    // Ignore secondary buttons / multi-touch duplicates; keep the gesture
+    // on the playfield so iOS doesn't treat it as a page scroll.
+    if (e.button !== 0) return
+    e.preventDefault()
+    jump()
+  }
+
+  const jumpLabel =
+    status === 'idle' ? 'Tap to deploy' : status === 'over' ? 'Tap to redeploy' : 'Tap to jump'
+
   return (
-    <div className="w-full">
+    <div ref={wrapRef} className="w-full touch-none select-none">
       <canvas
         ref={canvasRef}
-        onPointerDown={(e) => {
-          e.preventDefault()
-          jump()
-        }}
+        onPointerDown={onPlayPointer}
         role="img"
         aria-label="Ship It! runner game"
-        className="w-full cursor-pointer touch-none rounded-xl border border-white/10"
-        style={{ aspectRatio: `${WIDTH} / ${HEIGHT}` }}
+        className="w-full cursor-pointer rounded-xl border border-white/10"
+        style={{
+          aspectRatio: `${WIDTH} / ${HEIGHT}`,
+          touchAction: 'none',
+          WebkitUserSelect: 'none',
+          userSelect: 'none',
+        }}
       />
+
+      {/* Large thumb target — always useful on phones; hidden on fine pointers. */}
+      <button
+        type="button"
+        onPointerDown={onPlayPointer}
+        className={[
+          'mt-3 w-full rounded-xl border border-brand-400/40 bg-brand-500/90 px-4 py-3.5',
+          'text-sm font-bold tracking-wide text-white shadow-lg shadow-brand-500/20',
+          'active:bg-brand-400 transition-colors',
+          coarsePointer ? 'flex' : 'flex sm:hidden',
+          'items-center justify-center gap-2',
+        ].join(' ')}
+        aria-label={jumpLabel}
+      >
+        <span aria-hidden className="text-base">
+          ▲
+        </span>
+        {jumpLabel}
+      </button>
+
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
         <span>
           {status === 'running'
@@ -587,7 +734,7 @@ export default function RunnerGame() {
               : catNote
             : status === 'over'
               ? `Last run: ${lastScore} commits.`
-              : 'Idle. Awaiting deployment.'}
+              : 'Idle. Awaiting deployment. Watch the skies for CVEs, pagers & policy DENYs.'}
         </span>
         <span className="font-mono">
           <span className="text-brand-400">best</span> {hiScore} commits
