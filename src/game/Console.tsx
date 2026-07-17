@@ -19,13 +19,22 @@ export default function Console({ onClassic }: ConsoleProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // While playing, keep the page from rubber-banding under the canvas on iOS.
+  // While playing, lock document scroll so taps/jumps don't drag the page
+  // (especially important on iOS Safari rubber-band / address-bar resize).
   useEffect(() => {
     if (!playing) return
-    const prev = document.documentElement.style.overscrollBehavior
-    document.documentElement.style.overscrollBehavior = 'none'
+    const html = document.documentElement
+    const body = document.body
+    const prevHtmlOverscroll = html.style.overscrollBehavior
+    const prevBodyOverflow = body.style.overflow
+    const prevBodyTouchAction = body.style.touchAction
+    html.style.overscrollBehavior = 'none'
+    body.style.overflow = 'hidden'
+    body.style.touchAction = 'none'
     return () => {
-      document.documentElement.style.overscrollBehavior = prev
+      html.style.overscrollBehavior = prevHtmlOverscroll
+      body.style.overflow = prevBodyOverflow
+      body.style.touchAction = prevBodyTouchAction
     }
   }, [playing])
 
