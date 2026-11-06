@@ -54,7 +54,7 @@ export default function Console({ onClassic }: ConsoleProps) {
             {profile.name}
           </h1>
           <p className="mt-1 text-xs text-slate-400 sm:text-sm">
-            This is a résumé website. It is also, mysteriously, a video game.
+            Explore my experience, browse the terminal, or play a round.
           </p>
         </header>
 
